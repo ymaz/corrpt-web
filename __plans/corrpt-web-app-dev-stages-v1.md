@@ -13,17 +13,17 @@ STAGE 1: FOUNDATION                                          [WEEK 1-2]
   │ PHASE 1.1: Project Setup                              [Days 1-2]   │
   ├────────────────────────────────────────────────────────────────────┤
   │                                                                    │
-  │  □ Initialize Vite + React + TypeScript project                    │
-  │  □ Configure Tailwind CSS                                          │
-  │  □ Setup Biome for code format and linting (use default config)    │
-  │  □ Configure path aliases (@/components, @/hooks, etc.)            │
-  │  □ Install core dependencies:                                      │
+  │  ✅ Initialize Vite + React + TypeScript project                   │
+  │  ✅ Configure Tailwind CSS                                         │
+  │  ✅ Setup Biome for code format and linting (use default config)   │
+  │  ✅ Configure path aliases (@/components, @/hooks, etc.)           │
+  │  ✅ Install core dependencies:                                     │
   │    • three, @react-three/fiber                                     │
   │    • zustand                                                       │
   │    • @radix-ui/react-*                                             │
   │    • vite-plugin-glsl                                              │
-  │  □ Setup folder structure                                          │
-  │  □ Configure GLSL imports in TypeScript                            │
+  │  ✅ Setup folder structure                                         │
+  │  ✅ Configure GLSL imports in TypeScript                           │
   │                                                                    │
   │  Deliverable: Runnable empty project with all tooling              │
   └────────────────────────────────────────────────────────────────────┘
