@@ -87,39 +87,69 @@ The store is organized into three slices:
 
 State changes automatically trigger uniform updates in shaders via useEffect subscriptions.
 
-#### Three.js Rendering Setup
+#### Three.js Rendering Setup (Implemented — Phase 1.2)
 
-- **Camera**: OrthographicCamera (left: -1, right: 1, top: 1, bottom: -1) for 2D rendering
-- **Geometry**: Full-screen quad (PlaneGeometry)
-- **Materials**: ShaderMaterial for each effect with custom GLSL
-- **Renderer**: WebGLRenderer with `preserveDrawingBuffer: true` for export
+- **Canvas**: R3F `<Canvas orthographic linear flat>` with `RENDERER_SETTINGS` from `src/lib/constants.ts`
+- **Camera**: R3F orthographic camera (`zoom: 1, position: [0, 0, 1]`). Viewport units adapt to canvas size.
+- **Geometry**: `PlaneGeometry(1, 1)` scaled by viewport dimensions for aspect-correct contain/letterbox display
+- **Materials**: drei `shaderMaterial()` creates `PassthroughMaterial` registered as `<passthroughMaterial>` JSX element
+- **Renderer**: WebGLRenderer with `preserveDrawingBuffer: true`, `alpha: true`, `antialias: false`, `powerPreference: "high-performance"`
+- **Color Management**: `linear={true}` + `flat={true}` on Canvas + `NoColorSpace` on textures — bypasses Three.js color management for raw sRGB passthrough, avoids double-gamma issues with ShaderMaterial
+- **Render Loop**: `useFrame` in `ImagePlane` increments `u_time` uniform each frame
+
+#### Passthrough Shader (Standard Uniform Interface)
+
+All effect shaders share the vertex shader `src/effects/shaders/common/passthrough.vert` and must accept these uniforms:
+- `u_texture` (sampler2D): Input texture from previous pass
+- `u_resolution` (vec2): Image dimensions in pixels
+- `u_time` (float): Elapsed time in seconds
+
+#### Image Loading (Implemented — Phase 1.2)
+
+`useImageLoader` hook (`src/hooks/useImageLoader.ts`) manages the File → THREE.Texture pipeline as local React state. Will be migrated to Zustand in Phase 1.3.
+
+- Validates file type (`SUPPORTED_IMAGE_TYPES`) and size (`MAX_FILE_SIZE` = 50MB)
+- Pipeline: `File → FileReader → HTMLImageElement → THREE.Texture`
+- Texture config: `needsUpdate`, `NoColorSpace`, `LinearFilter` min/mag
+- Disposes texture on unmount and on new image load
 
 ### Folder Structure
 
 ```
 src/
-├── app/                    # App-level config (App.tsx, main.tsx, providers.tsx)
+├── app/
+│   ├── App.tsx              # [1.2] Test harness with EffectCanvas + file input
+│   └── main.tsx             # [1.1] React entry point
 ├── components/
-│   ├── canvas/            # Three.js canvas components (EffectCanvas, ImagePlane, EffectMaterial)
-│   ├── controls/          # Effect control UI (EffectPanel, ParameterSlider, EffectCard)
-│   ├── input/             # Image input (DropZone, FileUpload, CameraCapture)
-│   ├── layout/            # Layout components (Header, Sidebar, Footer, MainLayout)
-│   ├── export/            # Export functionality (ExportModal, FormatSelector, QualitySlider)
-│   └── ui/                # Shared UI primitives (Button, Slider, Modal, Tooltip)
+│   ├── canvas/
+│   │   ├── EffectCanvas.tsx # [1.2] R3F Canvas wrapper (orthographic, linear, flat)
+│   │   ├── EffectMaterial.tsx # [1.2] drei shaderMaterial + JSX type augmentation
+│   │   └── ImagePlane.tsx   # [1.2] Aspect-correct fullscreen quad with u_time
+│   ├── controls/            # (Phase 4) Effect control UI
+│   ├── input/               # (Phase 2) Image input (DropZone, FileUpload, CameraCapture)
+│   ├── layout/              # (Phase 4) Layout components (Header, Sidebar, Footer)
+│   ├── export/              # (Phase 5) Export functionality
+│   └── ui/                  # Shared UI primitives (Radix-based)
 ├── effects/
-│   ├── shaders/           # GLSL shader files organized by effect
-│   │   ├── rgb-shift/    # fragment.glsl, vertex.glsl, index.ts
-│   │   ├── pixel-sort/
-│   │   └── common/       # Shared utilities (noise.glsl, color.glsl, distortion.glsl)
-│   ├── processors/        # Effect processor classes (BaseEffect, RGBShiftEffect, PixelSortEffect)
-│   ├── EffectPipeline.ts
-│   ├── EffectRegistry.ts
-│   └── types.ts
-├── hooks/                 # Custom React hooks (useImageLoader, useEffectProcessor, useCanvasExport, useCamera)
-├── store/                 # Zustand store slices (imageStore, effectStore, uiStore, index.ts)
-├── lib/                   # Utilities (three-utils, image-utils, export-utils, constants)
-├── styles/                # Global styles (globals.css, fonts.css, animations.css)
-└── types/                 # TypeScript definitions (effects.d.ts, glsl.d.ts, global.d.ts)
+│   ├── shaders/
+│   │   ├── common/
+│   │   │   ├── passthrough.vert  # [1.2] Standard vertex shader (shared by all effects)
+│   │   │   └── passthrough.frag  # [1.2] Identity fragment shader (standard uniform interface)
+│   │   ├── rgb-shift/       # (Phase 3) fragment.glsl, vertex.glsl
+│   │   └── pixel-sort/      # (Phase 3)
+│   ├── processors/          # (Phase 3) Effect processor classes
+│   ├── EffectPipeline.ts    # (Phase 3)
+│   ├── EffectRegistry.ts    # (Phase 3)
+│   └── types.ts             # (Phase 3)
+├── hooks/
+│   └── useImageLoader.ts    # [1.2] File → THREE.Texture pipeline (local state)
+├── store/                   # (Phase 1.3) Zustand store slices
+├── lib/
+│   └── constants.ts         # [1.2] RENDERER_SETTINGS, SUPPORTED_IMAGE_TYPES, MAX_FILE_SIZE
+├── styles/
+│   └── globals.css          # [1.1] Tailwind import + base styles
+└── types/
+    └── glsl.d.ts            # [1.1] Shader import type declarations
 ```
 
 ## Initial Effects
@@ -170,13 +200,14 @@ material.uniforms.u_intensity.value = 0.75;
 uniform float u_intensity;
 ```
 
-### Image Loading Pipeline
+### Image Loading Pipeline (Implemented — Phase 1.2)
 
-File/Blob → FileReader → Image element → THREE.Texture
+File → FileReader → HTMLImageElement → THREE.Texture (in `useImageLoader` hook)
 
-- Handle EXIF orientation automatically
-- Validate file type and size
-- Calculate aspect-correct sizing for canvas display
+- Validates file type (JPEG/PNG/WebP) and size (max 50MB)
+- Texture config: `needsUpdate`, `NoColorSpace`, `LinearFilter`
+- Aspect-correct display via viewport contain/letterbox in `ImagePlane`
+- EXIF orientation handling: deferred to Phase 2.1
 
 ### Export at Full Resolution
 
@@ -192,6 +223,9 @@ Use off-screen WebGLRenderer at original image dimensions:
 The project follows a 5-stage development plan:
 
 1. **Foundation** (Week 1-2): Project setup, Three.js canvas, state management
+   - Phase 1.1: Project setup — **DONE**
+   - Phase 1.2: Core Three.js setup — **DONE**
+   - Phase 1.3: State management — next
 2. **Input System** (Week 2): File upload and camera capture
 3. **Effect System** (Week 3): Effect architecture, RGB Shift, Pixel Sort
 4. **User Interface** (Week 4): Layout, effect controls, visual polish
@@ -253,3 +287,14 @@ Target: Chrome 90+, Firefox 90+, Safari 14+, Edge 90+, iOS Safari 14+, Chrome An
 5. **Biome**: Modern, fast linting/formatting (use default config)
 6. **FBO chain**: Multi-pass rendering for effect stacking
 7. **GPU shaders**: All effects implemented as GLSL fragment shaders for performance
+8. **drei `shaderMaterial()`** over raw `THREE.ShaderMaterial`: Typed uniform props, R3F reconciler key, reusable class pattern
+9. **`PlaneGeometry(1,1)` + scale** over `PlaneGeometry(2,2)`: R3F orthographic camera adapts to canvas size; scaling a unit quad by viewport dimensions is the correct R3F approach
+10. **`linear` + `flat` + `NoColorSpace`**: Bypasses Three.js color management entirely for raw sRGB passthrough — correct for sRGB content on sRGB monitors
+11. **`.glsl` files** over inline strings: Validates vite-plugin-glsl pipeline, enables shader reuse, proper syntax highlighting
+
+## Testing
+
+- **Playwright** is installed as a dev dependency for headless browser validation
+- Regression test script: `test-assets/validate-canvas.mjs` — starts dev server, uploads test image, takes screenshots at multiple viewport sizes
+- Generated screenshots are in `test-assets/screenshots/` (gitignored)
+- Run: `node test-assets/validate-canvas.mjs`

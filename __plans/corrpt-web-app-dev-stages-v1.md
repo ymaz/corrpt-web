@@ -32,13 +32,13 @@ STAGE 1: FOUNDATION                                          [WEEK 1-2]
   │ PHASE 1.2: Core Three.js Setup                        [Days 3-5]   │
   ├────────────────────────────────────────────────────────────────────┤
   │                                                                    │
-  │  □ Create EffectCanvas component with R3F                          │
-  │  □ Setup OrthographicCamera for 2D rendering                       │
-  │  □ Create full-screen quad geometry                                │
-  │  □ Implement basic ShaderMaterial with passthrough                 │
-  │  □ Test texture loading and display                                │
-  │  □ Implement responsive canvas sizing                              │
-  │  □ Setup render loop with proper timing                            │
+  │  ✅ Create EffectCanvas component with R3F                          │
+  │  ✅ Setup OrthographicCamera for 2D rendering                      │
+  │  ✅ Create full-screen quad geometry                               │
+  │  ✅ Implement basic ShaderMaterial with passthrough                │
+  │  ✅ Test texture loading and display                               │
+  │  ✅ Implement responsive canvas sizing                             │
+  │  ✅ Setup render loop with proper timing                           │
   │                                                                    │
   │  Deliverable: Canvas displays uploaded image at correct aspect     │
   └────────────────────────────────────────────────────────────────────┘

@@ -32,7 +32,10 @@ let serverUrl = "";
 
 // Wait for dev server to be ready
 await new Promise((resolve, reject) => {
-	const timeout = setTimeout(() => reject(new Error("Dev server timeout")), 30000);
+	const timeout = setTimeout(
+		() => reject(new Error("Dev server timeout")),
+		30000,
+	);
 
 	devServer.stdout.on("data", (data) => {
 		const output = data.toString();
@@ -67,31 +70,41 @@ let exitCode = 0;
 
 try {
 	const browser = await chromium.launch({ headless: true });
-	const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+	const page = await browser.newPage({
+		viewport: { width: 1280, height: 720 },
+	});
 
 	// 1. Navigate and screenshot initial state (dark background, no image)
 	await page.goto(serverUrl, { waitUntil: "networkidle" });
 	await page.waitForTimeout(1000); // Let WebGL initialize
-	await page.screenshot({ path: path.join(screenshotDir, "01-initial-dark-bg.png") });
+	await page.screenshot({
+		path: path.join(screenshotDir, "01-initial-dark-bg.png"),
+	});
 	console.log("Screenshot 1: Initial state (dark background)");
 
 	// 2. Upload the test image
 	const fileInput = page.locator('input[type="file"]');
 	await fileInput.setInputFiles(testImage);
 	await page.waitForTimeout(2000); // Let texture load and render
-	await page.screenshot({ path: path.join(screenshotDir, "02-image-uploaded.png") });
+	await page.screenshot({
+		path: path.join(screenshotDir, "02-image-uploaded.png"),
+	});
 	console.log("Screenshot 2: After image upload");
 
 	// 3. Resize to a tall viewport and screenshot (should pillarbox)
 	await page.setViewportSize({ width: 400, height: 800 });
 	await page.waitForTimeout(1000);
-	await page.screenshot({ path: path.join(screenshotDir, "03-tall-viewport.png") });
+	await page.screenshot({
+		path: path.join(screenshotDir, "03-tall-viewport.png"),
+	});
 	console.log("Screenshot 3: Tall viewport (pillarbox expected)");
 
 	// 4. Resize to a wide viewport and screenshot (should letterbox)
 	await page.setViewportSize({ width: 1400, height: 400 });
 	await page.waitForTimeout(1000);
-	await page.screenshot({ path: path.join(screenshotDir, "04-wide-viewport.png") });
+	await page.screenshot({
+		path: path.join(screenshotDir, "04-wide-viewport.png"),
+	});
 	console.log("Screenshot 4: Wide viewport (letterbox expected)");
 
 	// 5. Check for console errors
