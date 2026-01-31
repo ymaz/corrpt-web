@@ -1,0 +1,45 @@
+import { create } from "zustand";
+
+import type { EffectStore } from "@/store/types";
+
+export const useEffectStore = create<EffectStore>((set, get) => ({
+	activeEffects: [],
+	parameters: {},
+	previewMode: "full",
+
+	addEffect: (id: string) => {
+		const { activeEffects } = get();
+		if (activeEffects.includes(id)) return;
+		set({
+			activeEffects: [...activeEffects, id],
+			parameters: { ...get().parameters, [id]: {} },
+		});
+	},
+
+	removeEffect: (id: string) => {
+		const { activeEffects, parameters } = get();
+		const { [id]: _, ...rest } = parameters;
+		set({
+			activeEffects: activeEffects.filter((e) => e !== id),
+			parameters: rest,
+		});
+	},
+
+	setEffectParam: (
+		effectId: string,
+		paramName: string,
+		value: number | boolean | string,
+	) => {
+		const { parameters } = get();
+		set({
+			parameters: {
+				...parameters,
+				[effectId]: { ...parameters[effectId], [paramName]: value },
+			},
+		});
+	},
+
+	setPreviewMode: (mode) => {
+		set({ previewMode: mode });
+	},
+}));

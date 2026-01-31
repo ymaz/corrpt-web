@@ -32,7 +32,7 @@ STAGE 1: FOUNDATION                                          [WEEK 1-2]
   │ PHASE 1.2: Core Three.js Setup                        [Days 3-5]   │
   ├────────────────────────────────────────────────────────────────────┤
   │                                                                    │
-  │  ✅ Create EffectCanvas component with R3F                          │
+  │  ✅ Create EffectCanvas component with R3F                         │
   │  ✅ Setup OrthographicCamera for 2D rendering                      │
   │  ✅ Create full-screen quad geometry                               │
   │  ✅ Implement basic ShaderMaterial with passthrough                │
@@ -47,15 +47,15 @@ STAGE 1: FOUNDATION                                          [WEEK 1-2]
   │ PHASE 1.3: State Management                           [Days 6-7]   │
   ├────────────────────────────────────────────────────────────────────┤
   │                                                                    │
-  │  □ Design Zustand store schema                                     │
-  │  □ Implement imageStore slice:                                     │
+  │  ✅ Design Zustand store schema                                     │
+  │  ✅ Implement imageStore slice:                                     │
   │    • texture, dimensions, loading state                            │
-  │  □ Implement effectStore slice:                                    │
+  │  ✅ Implement effectStore slice:                                    │
   │    • activeEffects[], parameters, intensity                        │
-  │  □ Implement uiStore slice:                                        │
+  │  ✅ Implement uiStore slice:                                        │
   │    • modals, sidebar, theme                                        │
-  │  □ Create TypeScript interfaces for all state                      │
-  │  □ Wire store to canvas component                                  │
+  │  ✅ Create TypeScript interfaces for all state                      │
+  │  ✅ Wire store to canvas component                                  │
   │                                                                    │
   │  Deliverable: State changes reflected in canvas                    │
   └────────────────────────────────────────────────────────────────────┘

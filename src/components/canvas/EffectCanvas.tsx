@@ -1,15 +1,16 @@
 import { Canvas } from "@react-three/fiber";
-import type * as THREE from "three";
 
 import { ImagePlane } from "@/components/canvas/ImagePlane";
 import { RENDERER_SETTINGS } from "@/lib/constants";
+import { useImageStore } from "@/store/imageStore";
 
 interface EffectCanvasProps {
-	texture: THREE.Texture | null;
 	className?: string;
 }
 
-export function EffectCanvas({ texture, className }: EffectCanvasProps) {
+export function EffectCanvas({ className }: EffectCanvasProps) {
+	const texture = useImageStore((s) => s.texture);
+
 	return (
 		<Canvas
 			className={className}

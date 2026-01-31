@@ -1,10 +1,17 @@
 import { type ChangeEvent, useCallback } from "react";
+import { useShallow } from "zustand/react/shallow";
 
 import { EffectCanvas } from "@/components/canvas/EffectCanvas";
-import { useImageLoader } from "@/hooks/useImageLoader";
+import { useImageStore } from "@/store/imageStore";
 
 function App() {
-	const { texture, isLoading, error, loadImage } = useImageLoader();
+	const { isLoading, error, loadImage } = useImageStore(
+		useShallow((s) => ({
+			isLoading: s.isLoading,
+			error: s.error,
+			loadImage: s.loadImage,
+		})),
+	);
 
 	const handleFileChange = useCallback(
 		(e: ChangeEvent<HTMLInputElement>) => {
@@ -18,7 +25,7 @@ function App() {
 
 	return (
 		<div style={{ width: "100vw", height: "100vh", position: "relative" }}>
-			<EffectCanvas texture={texture} />
+			<EffectCanvas />
 
 			<div
 				style={{
