@@ -1,5 +1,6 @@
 import { Canvas } from "@react-three/fiber";
 
+import { CanvasErrorBoundary } from "@/components/canvas/CanvasErrorBoundary";
 import { EffectPipeline } from "@/components/canvas/EffectPipeline";
 import "@/effects/definitions";
 import { RENDERER_SETTINGS } from "@/lib/constants";
@@ -11,18 +12,21 @@ interface EffectCanvasProps {
 
 export function EffectCanvas({ className }: EffectCanvasProps) {
 	const texture = useImageStore((s) => s.texture);
+	const originalDataUrl = useImageStore((s) => s.originalDataUrl);
 
 	return (
-		<Canvas
-			className={className}
-			orthographic
-			linear
-			flat
-			gl={RENDERER_SETTINGS}
-			camera={{ zoom: 1, near: 0.1, far: 100, position: [0, 0, 1] }}
-		>
-			<color attach="background" args={["#1a1a1a"]} />
-			{texture && <EffectPipeline texture={texture} />}
-		</Canvas>
+		<CanvasErrorBoundary resetKey={originalDataUrl}>
+			<Canvas
+				className={className}
+				orthographic
+				linear
+				flat
+				gl={RENDERER_SETTINGS}
+				camera={{ zoom: 1, near: 0.1, far: 100, position: [0, 0, 1] }}
+			>
+				<color attach="background" args={["#1a1a1a"]} />
+				{texture && <EffectPipeline texture={texture} />}
+			</Canvas>
+		</CanvasErrorBoundary>
 	);
 }

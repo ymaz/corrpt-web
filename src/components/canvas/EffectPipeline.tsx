@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 
 import "@/components/canvas/EffectMaterial";
-import { getEffect } from "@/effects/registry";
+import { renderEffectChain } from "@/effects/renderEffectChain";
 import { useEffectStore } from "@/store/effectStore";
 
 interface EffectPipelineProps {
@@ -34,8 +34,8 @@ export function EffectPipeline({ texture }: EffectPipelineProps) {
 	// Ping-pong FBOs at image dimensions
 	const fbos = useMemo(() => {
 		const options: THREE.RenderTargetOptions = {
-			minFilter: THREE.NearestFilter,
-			magFilter: THREE.NearestFilter,
+			minFilter: THREE.LinearFilter,
+			magFilter: THREE.LinearFilter,
 			format: THREE.RGBAFormat,
 			type: THREE.UnsignedByteType,
 		};
@@ -104,6 +104,12 @@ export function EffectPipeline({ texture }: EffectPipelineProps) {
 	// Reusable Vector2 for resolution uniform — avoids per-frame allocation
 	const resolutionRef = useRef(new THREE.Vector2());
 
+	// Stable Vector2 for JSX prop — avoids per-render allocation
+	const initialResolution = useMemo(
+		() => new THREE.Vector2(imageWidth, imageHeight),
+		[imageWidth, imageHeight],
+	);
+
 	useFrame((_state, delta) => {
 		timeRef.current += delta;
 
@@ -117,74 +123,21 @@ export function EffectPipeline({ texture }: EffectPipelineProps) {
 			return;
 		}
 
-		const cache = materialCacheRef.current;
 		resolutionRef.current.set(imageWidth, imageHeight);
-		let readIndex = 0;
-		let passCount = 0;
 
-		for (let i = 0; i < activeEffects.length; i++) {
-			const effectId = activeEffects[i];
-			const def = getEffect(effectId);
-			if (!def) continue;
+		const outputTexture = renderEffectChain({
+			gl,
+			texture,
+			activeEffects,
+			parameters,
+			fbos,
+			offScreen,
+			materialCache: materialCacheRef.current,
+			resolution: resolutionRef.current,
+			time: timeRef.current,
+		});
 
-			// Get or create cached material
-			let mat = cache.get(effectId);
-			if (!mat) {
-				const uniforms: Record<string, THREE.IUniform> = {
-					u_texture: { value: null },
-					u_resolution: { value: new THREE.Vector2() },
-					u_time: { value: 0 },
-				};
-				for (const p of def.parameters) {
-					const uniformName = `u_${p.name}`;
-					uniforms[uniformName] = {
-						value: p.type === "bool" ? (p.default ? 1.0 : 0.0) : p.default,
-					};
-				}
-				mat = new THREE.ShaderMaterial({
-					vertexShader: def.vertexShader,
-					fragmentShader: def.fragmentShader,
-					uniforms,
-				});
-				cache.set(effectId, mat);
-			}
-
-			// First actual pass reads original texture; subsequent read previous FBO
-			const inputTexture = passCount === 0 ? texture : fbos[readIndex].texture;
-			mat.uniforms.u_texture.value = inputTexture;
-			mat.uniforms.u_resolution.value.copy(resolutionRef.current);
-			mat.uniforms.u_time.value = timeRef.current;
-
-			// Update effect-specific uniforms from store parameters
-			const params = parameters[effectId];
-			if (params && def.parameters.length > 0) {
-				for (const p of def.parameters) {
-					const uniformName = `u_${p.name}`;
-					if (uniformName in mat.uniforms) {
-						const val = params[p.name];
-						if (val !== undefined) {
-							mat.uniforms[uniformName].value =
-								p.type === "bool" ? (val ? 1.0 : 0.0) : val;
-						}
-					}
-				}
-			}
-
-			// Render to write FBO
-			const writeIndex = 1 - readIndex;
-			offScreen.mesh.material = mat;
-			gl.setRenderTarget(fbos[writeIndex]);
-			gl.render(offScreen.scene, offScreen.camera);
-			gl.setRenderTarget(null);
-
-			// Swap for next pass
-			readIndex = writeIndex;
-			passCount++;
-		}
-
-		// Set visible mesh to final output (or original if all effects were skipped)
-		materialRef.current.uniforms.u_texture.value =
-			passCount > 0 ? fbos[readIndex].texture : texture;
+		materialRef.current.uniforms.u_texture.value = outputTexture;
 	});
 
 	return (
@@ -193,7 +146,7 @@ export function EffectPipeline({ texture }: EffectPipelineProps) {
 			<passthroughMaterial
 				ref={materialRef}
 				u_texture={texture}
-				u_resolution={new THREE.Vector2(imageWidth, imageHeight)}
+				u_resolution={initialResolution}
 			/>
 		</mesh>
 	);

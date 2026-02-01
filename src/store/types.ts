@@ -29,7 +29,7 @@ export type ImageStore = ImageState & ImageActions;
 // Effect store
 export interface EffectState {
 	activeEffects: string[];
-	parameters: Record<string, Record<string, number | boolean | string>>;
+	parameters: Record<string, Record<string, number | boolean>>;
 	previewMode: PreviewMode;
 }
 
@@ -39,8 +39,9 @@ export interface EffectActions {
 	setEffectParam: (
 		effectId: string,
 		paramName: string,
-		value: number | boolean | string,
+		value: number | boolean,
 	) => void;
+	reorderEffects: (effectIds: string[]) => void;
 	setPreviewMode: (mode: PreviewMode) => void;
 }
 

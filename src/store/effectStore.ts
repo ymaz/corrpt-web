@@ -12,7 +12,7 @@ export const useEffectStore = create<EffectStore>((set, get) => ({
 		const { activeEffects } = get();
 		if (activeEffects.includes(id)) return;
 		const def = getEffect(id);
-		const defaults: Record<string, number | boolean | string> = {};
+		const defaults: Record<string, number | boolean> = {};
 		if (def) {
 			for (const p of def.parameters) {
 				defaults[p.name] = p.default;
@@ -36,7 +36,7 @@ export const useEffectStore = create<EffectStore>((set, get) => ({
 	setEffectParam: (
 		effectId: string,
 		paramName: string,
-		value: number | boolean | string,
+		value: number | boolean,
 	) => {
 		const { parameters } = get();
 		set({
@@ -45,6 +45,10 @@ export const useEffectStore = create<EffectStore>((set, get) => ({
 				[effectId]: { ...parameters[effectId], [paramName]: value },
 			},
 		});
+	},
+
+	reorderEffects: (effectIds: string[]) => {
+		set({ activeEffects: effectIds });
 	},
 
 	setPreviewMode: (mode) => {
