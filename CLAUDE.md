@@ -60,10 +60,11 @@ Each effect:
 - Writes to the next FBO in the chain
 - Final pass renders to screen canvas
 
-**Key Classes:**
-- `BaseEffect`: Abstract base class for all effects (defines interface)
-- `EffectPipeline`: Manages multi-pass rendering and effect ordering
-- `EffectRegistry`: Effect discovery and metadata management
+**Key Modules (Implemented — Phase 3.1):**
+- `EffectDefinition` + `EffectParameterDef`: TypeScript interfaces defining effect metadata, shaders, and parameters (`src/effects/types.ts`)
+- `EffectRegistry`: Map-based registry with `registerEffect()`, `getEffect()`, `getAllEffects()` (`src/effects/registry.ts`)
+- `EffectPipeline`: R3F component managing multi-pass FBO rendering, material caching, and per-frame uniform updates (`src/components/canvas/EffectPipeline.tsx`)
+- Effect definitions: Self-registering modules in `src/effects/definitions/` — imported via barrel at canvas mount
 
 #### State Management (Zustand)
 
@@ -92,10 +93,10 @@ State changes automatically trigger uniform updates in shaders via useEffect sub
 - **Canvas**: R3F `<Canvas orthographic linear flat>` with `RENDERER_SETTINGS` from `src/lib/constants.ts`
 - **Camera**: R3F orthographic camera (`zoom: 1, position: [0, 0, 1]`). Viewport units adapt to canvas size.
 - **Geometry**: `PlaneGeometry(1, 1)` scaled by viewport dimensions for aspect-correct contain/letterbox display
-- **Materials**: drei `shaderMaterial()` creates `PassthroughMaterial` registered as `<passthroughMaterial>` JSX element
+- **Materials**: drei `shaderMaterial()` creates `PassthroughMaterial` registered as `<passthroughMaterial>` JSX element (used as final display surface)
 - **Renderer**: WebGLRenderer with `preserveDrawingBuffer: true`, `alpha: true`, `antialias: false`, `powerPreference: "high-performance"`
 - **Color Management**: `linear={true}` + `flat={true}` on Canvas + `NoColorSpace` on textures — bypasses Three.js color management for raw sRGB passthrough, avoids double-gamma issues with ShaderMaterial
-- **Render Loop**: `useFrame` in `ImagePlane` increments `u_time` uniform each frame
+- **Render Loop**: `useFrame` in `EffectPipeline` increments `u_time`, runs multi-pass FBO rendering, and updates the display mesh each frame
 
 #### Passthrough Shader (Standard Uniform Interface)
 
@@ -104,48 +105,67 @@ All effect shaders share the vertex shader `src/effects/shaders/common/passthrou
 - `u_resolution` (vec2): Image dimensions in pixels
 - `u_time` (float): Elapsed time in seconds
 
-#### Image Loading (Implemented — Phase 1.2)
+#### Image Loading (Implemented — Phase 1.2, migrated to Zustand in Phase 1.3)
 
-`useImageLoader` hook (`src/hooks/useImageLoader.ts`) manages the File → THREE.Texture pipeline as local React state. Will be migrated to Zustand in Phase 1.3.
+`imageStore.loadImage()` (`src/store/imageStore.ts`) manages the File → THREE.Texture pipeline in Zustand global state.
 
 - Validates file type (`SUPPORTED_IMAGE_TYPES`) and size (`MAX_FILE_SIZE` = 50MB)
 - Pipeline: `File → FileReader → HTMLImageElement → THREE.Texture`
 - Texture config: `needsUpdate`, `NoColorSpace`, `LinearFilter` min/mag
-- Disposes texture on unmount and on new image load
+- Disposes texture on `clearImage()` and on new image load
+- Legacy `useImageLoader` hook still exists at `src/hooks/useImageLoader.ts` (unused, kept for reference)
 
 ### Folder Structure
 
 ```
 src/
 ├── app/
-│   ├── App.tsx              # [1.2] Test harness with EffectCanvas + file input
+│   ├── App.tsx              # [2.1] App shell: DropZone > EffectCanvas + ImageActions + EffectDevPanel
 │   └── main.tsx             # [1.1] React entry point
 ├── components/
 │   ├── canvas/
-│   │   ├── EffectCanvas.tsx # [1.2] R3F Canvas wrapper (orthographic, linear, flat)
+│   │   ├── EffectCanvas.tsx  # [3.1] R3F Canvas wrapper, imports effect definitions barrel
 │   │   ├── EffectMaterial.tsx # [1.2] drei shaderMaterial + JSX type augmentation
-│   │   └── ImagePlane.tsx   # [1.2] Aspect-correct fullscreen quad with u_time
-│   ├── controls/            # (Phase 4) Effect control UI
-│   ├── input/               # (Phase 2) Image input (DropZone, FileUpload, CameraCapture)
+│   │   ├── EffectPipeline.tsx # [3.1] Multi-pass FBO renderer with material cache
+│   │   └── ImagePlane.tsx    # [1.2] Simple passthrough quad (superseded by EffectPipeline)
+│   ├── controls/
+│   │   └── EffectDevPanel.tsx # [3.2] Temporary floating dev panel for effect parameter tweaking
+│   ├── input/
+│   │   ├── DropZone.tsx      # [2.1] Drag-and-drop wrapper with landing/overlay states
+│   │   ├── DropZoneLanding.tsx # [2.1] Empty-state card (click-to-browse)
+│   │   ├── DropZoneOverlay.tsx # [2.1] Drag-over replacement indicator
+│   │   ├── ImageActions.tsx   # [2.1] Floating replace button
+│   │   └── index.ts          # [2.1] Barrel export
 │   ├── layout/              # (Phase 4) Layout components (Header, Sidebar, Footer)
 │   ├── export/              # (Phase 5) Export functionality
-│   └── ui/                  # Shared UI primitives (Radix-based)
+│   └── ui/
+│       └── index.ts         # Shared UI primitives (Radix-based)
 ├── effects/
+│   ├── definitions/
+│   │   ├── index.ts          # [3.1] Barrel — imports all effect definitions (side-effect registration)
+│   │   ├── passthrough.ts    # [3.1] Identity effect definition
+│   │   └── rgbShift.ts       # [3.2] RGB Shift effect definition
+│   ├── processors/
+│   │   └── index.ts          # (reserved for future CPU-side processors)
 │   ├── shaders/
 │   │   ├── common/
 │   │   │   ├── passthrough.vert  # [1.2] Standard vertex shader (shared by all effects)
-│   │   │   └── passthrough.frag  # [1.2] Identity fragment shader (standard uniform interface)
-│   │   ├── rgb-shift/       # (Phase 3) fragment.glsl, vertex.glsl
-│   │   └── pixel-sort/      # (Phase 3)
-│   ├── processors/          # (Phase 3) Effect processor classes
-│   ├── EffectPipeline.ts    # (Phase 3)
-│   ├── EffectRegistry.ts    # (Phase 3)
-│   └── types.ts             # (Phase 3)
+│   │   │   └── passthrough.frag  # [1.2] Identity fragment shader
+│   │   └── rgb-shift/
+│   │       └── fragment.glsl     # [3.2] RGB channel separation + directional offset
+│   ├── registry.ts           # [3.1] Map-based effect registry (registerEffect/getEffect/getAllEffects)
+│   └── types.ts              # [3.1] EffectDefinition, EffectParameterDef, EffectParameterValues
 ├── hooks/
-│   └── useImageLoader.ts    # [1.2] File → THREE.Texture pipeline (local state)
-├── store/                   # (Phase 1.3) Zustand store slices
+│   └── useImageLoader.ts    # [1.2] Legacy File → THREE.Texture hook (unused, superseded by imageStore)
+├── store/
+│   ├── index.ts             # [1.3] Barrel export
+│   ├── types.ts             # [1.3] Store type interfaces (ImageStore, EffectStore, UIStore)
+│   ├── imageStore.ts        # [1.3] Image loading, texture management, validation
+│   ├── effectStore.ts       # [1.3] Active effects, parameters, preview mode
+│   └── uiStore.ts           # [1.3] Sidebar, modals, theme
 ├── lib/
-│   └── constants.ts         # [1.2] RENDERER_SETTINGS, SUPPORTED_IMAGE_TYPES, MAX_FILE_SIZE
+│   ├── constants.ts         # [1.2] RENDERER_SETTINGS, SUPPORTED_IMAGE_TYPES, MAX_FILE_SIZE
+│   └── cn.ts                # Utility for className merging
 ├── styles/
 │   └── globals.css          # [1.1] Tailwind import + base styles
 └── types/
@@ -154,7 +174,7 @@ src/
 
 ## Initial Effects
 
-### RGB Shift (Chromatic Aberration)
+### RGB Shift (Chromatic Aberration) — Implemented (Phase 3.2)
 Separates RGB channels and offsets them directionally.
 
 **Shader Algorithm:**
@@ -185,29 +205,32 @@ GPU-friendly approximation of pixel sorting using brightness threshold detection
 
 ## Implementation Notes
 
-### Shader Uniform Management
+### Shader Uniform Management (Implemented — Phase 3.1)
 
-Uniforms flow from UI controls → Zustand store → Three.js materials:
+Uniforms flow from UI controls → Zustand store → Three.js materials per frame:
 
 ```typescript
 // UI slider onChange triggers store update
-setEffectParam('rgbShift', { intensity: 0.75 });
+setEffectParam('rgbShift', 'intensity', 0.75);
 
-// useEffect subscription updates material
-material.uniforms.u_intensity.value = 0.75;
+// EffectPipeline.useFrame reads store and updates cached material uniforms
+const params = parameters[effectId];
+mat.uniforms.u_intensity.value = params.intensity;
 
-// Shader receives updated value
+// Shader receives updated value next frame
 uniform float u_intensity;
 ```
 
-### Image Loading Pipeline (Implemented — Phase 1.2)
+Convention: parameter name `foo` maps to uniform `u_foo`. Bool parameters are sent as `0.0`/`1.0` floats.
 
-File → FileReader → HTMLImageElement → THREE.Texture (in `useImageLoader` hook)
+### Image Loading Pipeline (Implemented — Phase 1.2, migrated Phase 1.3)
+
+File → FileReader → HTMLImageElement → THREE.Texture (in `imageStore.loadImage()`)
 
 - Validates file type (JPEG/PNG/WebP) and size (max 50MB)
 - Texture config: `needsUpdate`, `NoColorSpace`, `LinearFilter`
-- Aspect-correct display via viewport contain/letterbox in `ImagePlane`
-- EXIF orientation handling: deferred to Phase 2.1
+- Aspect-correct display via viewport contain/letterbox in `EffectPipeline`
+- EXIF orientation: handled natively by target browsers (Chrome 81+, Firefox 77+, Safari 14+)
 
 ### Export at Full Resolution
 
@@ -225,9 +248,14 @@ The project follows a 5-stage development plan:
 1. **Foundation** (Week 1-2): Project setup, Three.js canvas, state management
    - Phase 1.1: Project setup — **DONE**
    - Phase 1.2: Core Three.js setup — **DONE**
-   - Phase 1.3: State management — next
+   - Phase 1.3: State management — **DONE**
 2. **Input System** (Week 2): File upload and camera capture
+   - Phase 2.1: File upload + drag-and-drop — **DONE**
+   - Phase 2.2: Camera capture — pending
 3. **Effect System** (Week 3): Effect architecture, RGB Shift, Pixel Sort
+   - Phase 3.1: Effect architecture (pipeline, registry, definitions) — **DONE**
+   - Phase 3.2: RGB Shift effect + dev controls — **DONE**
+   - Phase 3.3: Pixel Sort effect — next
 4. **User Interface** (Week 4): Layout, effect controls, visual polish
 5. **Export & Finishing** (Week 5): Export system, testing, deployment
 

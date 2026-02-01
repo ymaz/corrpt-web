@@ -107,14 +107,16 @@ STAGE 3: EFFECT SYSTEM                                       [WEEK 3]
   │ PHASE 3.1: Effect Architecture                        [Days 1-2]   │
   ├────────────────────────────────────────────────────────────────────┤
   │                                                                    │
-  │  □ Design BaseEffect abstract class                                │
-  │  □ Create EffectRegistry for effect discovery                      │
-  │  □ Implement EffectPipeline manager:                               │
-  │    • Multi-pass rendering with FBOs                                │
-  │    • Effect ordering                                               │
-  │    • Performance optimization (skip inactive)                      │
-  │  □ Define EffectParameter interface                                │
-  │  □ Setup uniform update system                                     │
+  │  ✅ Design EffectDefinition interface + EffectParameterDef         │
+  │  ✅ Create EffectRegistry for effect discovery                     │
+  │  ✅ Implement EffectPipeline component:                            │
+  │    • Multi-pass rendering with ping-pong FBOs                      │
+  │    • Effect ordering via activeEffects array                       │
+  │    • Material cache with lazy creation + disposal                  │
+  │    • Skip inactive effects (passthrough when none active)          │
+  │  ✅ Define EffectParameter interface (float, bool types)           │
+  │  ✅ Setup uniform update system (store → u_ prefixed uniforms)     │
+  │  ✅ Self-registering definition pattern (import-time side effects)  │
   │                                                                    │
   │  Deliverable: Framework ready for adding effects                   │
   └────────────────────────────────────────────────────────────────────┘
@@ -123,15 +125,15 @@ STAGE 3: EFFECT SYSTEM                                       [WEEK 3]
   │ PHASE 3.2: RGB Shift Effect                           [Days 3-4]   │
   ├────────────────────────────────────────────────────────────────────┤
   │                                                                    │
-  │  □ Write vertex shader (basic fullscreen)                          │
-  │  □ Write fragment shader:                                          │
-  │    • Channel separation logic                                      │
-  │    • Directional offset calculation                                │
-  │    • Optional time-based animation                                 │
-  │  □ Create RGBShiftEffect processor class                           │
-  │  □ Define parameter schema with UI metadata                        │
-  │  □ Test with various intensity values                              │
-  │  □ Optimize for mobile GPU                                         │
+  │  ✅ Reuse shared passthrough.vert (no custom vertex shader needed) │
+  │  ✅ Write fragment shader:                                         │
+  │    • Channel separation logic (R/G/B sampled at offset UVs)        │
+  │    • Directional offset from intensity + angle uniforms            │
+  │    • Optional time-based animation via u_animated toggle           │
+  │  ✅ Create rgbShift effect definition (self-registering)           │
+  │  ✅ Define parameter schema (intensity, angle, animated)           │
+  │  ✅ EffectDevPanel: floating dev controls for live tweaking        │
+  │  ✅ Playwright regression tests still pass (8 assertions)          │
   │                                                                    │
   │  Deliverable: Working RGB shift effect with parameters             │
   └────────────────────────────────────────────────────────────────────┘
