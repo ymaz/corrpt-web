@@ -68,13 +68,17 @@ STAGE 2: INPUT SYSTEM                                        [WEEK 2]
   │ PHASE 2.1: File Upload                                [Days 1-2]   │
   ├────────────────────────────────────────────────────────────────────┤
   │                                                                    │
-  │  □ Create DropZone component with drag state styling               │
-  │  □ Implement file validation (type, size)                          │
-  │  □ Create useImageLoader hook:                                     │
+  │  ✅ Create DropZone component with drag state styling              │
+  │  ✅ Implement file validation (type, size)                         │
+  │  ✅ Create useImageLoader hook:                                    │
   │    • FileReader → Image → THREE.Texture pipeline                   │
-  │  □ Handle EXIF orientation                                         │
-  │  □ Implement loading states and error handling                     │
-  │  □ Add FileUpload button as fallback                               │
+  │  ✅ Handle EXIF orientation (native browser support)               │
+  │  ✅ Implement loading states and error handling                    │
+  │  ✅ Add FileUpload button as fallback                              │
+  │  ✅ DropZoneLanding card (empty state, click-to-browse)            │
+  │  ✅ DropZoneOverlay (drag-over replacement indicator)              │
+  │  ✅ ImageActions floating replace button                           │
+  │  ✅ Playwright regression tests (12 assertions)                    │
   │                                                                    │
   │  Deliverable: Users can upload images via drag/drop or click       │
   └────────────────────────────────────────────────────────────────────┘
@@ -92,7 +96,7 @@ STAGE 2: INPUT SYSTEM                                        [WEEK 2]
   │  □ Capture frame to canvas → texture                               │
   │  □ Handle permission denied gracefully                             │
   │                                                                    │
-  │  Deliverable: Users can take photos with device camera             │
+  │  Deliverable: Users can take  photos with device camera             │
   └────────────────────────────────────────────────────────────────────┘
 
 

@@ -48,6 +48,9 @@ export const useImageStore = create<ImageStore>((set, get) => ({
 
 		reader.onload = () => {
 			const dataUrl = reader.result as string;
+			// EXIF orientation is applied natively by target browsers
+			// (Chrome 81+, Firefox 77+, Safari 14+) during HTMLImageElement
+			// decode, so img.width/height and pixel data are already rotated.
 			const img = new Image();
 
 			img.onload = () => {
