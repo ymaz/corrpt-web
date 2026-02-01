@@ -1,5 +1,6 @@
 import { create } from "zustand";
 
+import { getEffect } from "@/effects/registry";
 import type { EffectStore } from "@/store/types";
 
 export const useEffectStore = create<EffectStore>((set, get) => ({
@@ -10,9 +11,16 @@ export const useEffectStore = create<EffectStore>((set, get) => ({
 	addEffect: (id: string) => {
 		const { activeEffects } = get();
 		if (activeEffects.includes(id)) return;
+		const def = getEffect(id);
+		const defaults: Record<string, number | boolean | string> = {};
+		if (def) {
+			for (const p of def.parameters) {
+				defaults[p.name] = p.default;
+			}
+		}
 		set({
 			activeEffects: [...activeEffects, id],
-			parameters: { ...get().parameters, [id]: {} },
+			parameters: { ...get().parameters, [id]: defaults },
 		});
 	},
 

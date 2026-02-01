@@ -1,6 +1,7 @@
 import { Canvas } from "@react-three/fiber";
 
-import { ImagePlane } from "@/components/canvas/ImagePlane";
+import { EffectPipeline } from "@/components/canvas/EffectPipeline";
+import "@/effects/definitions";
 import { RENDERER_SETTINGS } from "@/lib/constants";
 import { useImageStore } from "@/store/imageStore";
 
@@ -21,7 +22,7 @@ export function EffectCanvas({ className }: EffectCanvasProps) {
 			camera={{ zoom: 1, near: 0.1, far: 100, position: [0, 0, 1] }}
 		>
 			<color attach="background" args={["#1a1a1a"]} />
-			{texture && <ImagePlane texture={texture} />}
+			{texture && <EffectPipeline texture={texture} />}
 		</Canvas>
 	);
 }
