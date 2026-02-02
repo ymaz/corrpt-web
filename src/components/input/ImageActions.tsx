@@ -3,6 +3,11 @@ import { useCallback, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { SUPPORTED_IMAGE_TYPES } from "@/lib/constants";
+import {
+	IMAGE_ERROR,
+	REPLACE_FILE_INPUT,
+	REPLACE_IMAGE_BUTTON,
+} from "@/lib/test-ids";
 import { useImageStore } from "@/store/imageStore";
 
 export function ImageActions() {
@@ -39,6 +44,7 @@ export function ImageActions() {
 	return (
 		<div className="absolute top-4 left-4 z-10 flex flex-col items-start gap-2">
 			<button
+				data-testid={REPLACE_IMAGE_BUTTON}
 				type="button"
 				onClick={handleClick}
 				className="rounded-lg bg-black/50 p-2 backdrop-blur-sm transition-colors hover:bg-black/70"
@@ -51,9 +57,14 @@ export function ImageActions() {
 				)}
 			</button>
 
-			{error && <p className="text-sm text-red-400">{error}</p>}
+			{error && (
+				<p data-testid={IMAGE_ERROR} className="text-sm text-red-400">
+					{error}
+				</p>
+			)}
 
 			<input
+				data-testid={REPLACE_FILE_INPUT}
 				ref={inputRef}
 				type="file"
 				accept={SUPPORTED_IMAGE_TYPES.join(",")}

@@ -4,6 +4,11 @@ import { useShallow } from "zustand/react/shallow";
 
 import { cn } from "@/lib/cn";
 import { SUPPORTED_IMAGE_TYPES } from "@/lib/constants";
+import {
+	DROPZONE_LANDING,
+	IMAGE_ERROR,
+	LANDING_FILE_INPUT,
+} from "@/lib/test-ids";
 import { useImageStore } from "@/store/imageStore";
 
 interface DropZoneLandingProps {
@@ -43,7 +48,10 @@ export function DropZoneLanding({
 	);
 
 	return (
-		<div className="absolute inset-0 z-10 flex items-center justify-center">
+		<div
+			data-testid={DROPZONE_LANDING}
+			className="absolute inset-0 z-10 flex items-center justify-center"
+		>
 			<button
 				type="button"
 				onClick={handleClick}
@@ -76,11 +84,17 @@ export function DropZoneLanding({
 				</div>
 
 				{error && (
-					<p className="max-w-xs text-center text-sm text-red-400">{error}</p>
+					<p
+						data-testid={IMAGE_ERROR}
+						className="max-w-xs text-center text-sm text-red-400"
+					>
+						{error}
+					</p>
 				)}
 			</button>
 
 			<input
+				data-testid={LANDING_FILE_INPUT}
 				ref={inputRef}
 				type="file"
 				accept={SUPPORTED_IMAGE_TYPES.join(",")}

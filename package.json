@@ -8,7 +8,7 @@
 		"build": "tsc && vite build",
 		"preview": "vite preview",
 		"lint": "biome check .",
-		"test:visual": "node test-assets/validate-canvas.mjs"
+		"test:e2e": "node test-assets/run-all.js"
 	},
 	"dependencies": {
 		"@radix-ui/react-dialog": "^1.1.15",
