@@ -31,10 +31,10 @@ const pixelSort: EffectDefinition = {
 		{
 			name: "spread",
 			type: "float",
-			default: 0.02,
+			default: 40,
 			min: 0,
-			max: 0.1,
-			step: 0.001,
+			max: 200,
+			step: 1,
 			label: "Spread",
 		},
 		{

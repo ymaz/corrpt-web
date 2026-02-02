@@ -16,13 +16,12 @@ void main() {
 
   if (brightness >= u_threshold && brightness <= u_upperThreshold) {
     vec2 dir = mix(vec2(1.0, 0.0), vec2(0.0, 1.0), u_direction);
-    vec2 texelSize = dir * u_spread / u_resolution * u_resolution;
-    vec2 step = dir * u_spread;
+    vec2 sortStep = dir * u_spread / u_resolution;
 
     vec4 sum = vec4(0.0);
     for (int i = 0; i < SAMPLES; i++) {
       float t = (float(i) / float(SAMPLES - 1)) - 0.5;
-      vec2 offset = step * t;
+      vec2 offset = sortStep * t;
       sum += texture2D(u_texture, vUv + offset);
     }
     gl_FragColor = sum / float(SAMPLES);

@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+
 import { getAllEffects } from "@/effects/registry";
 import { useEffectStore } from "@/store/effectStore";
 import { useImageStore } from "@/store/imageStore";
@@ -10,9 +12,12 @@ export function EffectDevPanel() {
 	const parameters = useEffectStore((s) => s.parameters);
 	const setEffectParam = useEffectStore((s) => s.setEffectParam);
 
-	if (!texture) return null;
+	const effects = useMemo(
+		() => getAllEffects().filter((e) => e.id !== "passthrough"),
+		[],
+	);
 
-	const effects = getAllEffects().filter((e) => e.id !== "passthrough");
+	if (!texture) return null;
 
 	return (
 		<div className="fixed bottom-4 right-4 z-50 w-64 max-h-[80vh] overflow-y-auto rounded-lg bg-black/80 p-4 text-sm text-white backdrop-blur-sm">
