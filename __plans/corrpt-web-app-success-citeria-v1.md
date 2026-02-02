@@ -7,15 +7,15 @@
 
 FUNCTIONALITY                                                        STATUS
 ─────────────────────────────────────────────────────────────────────────────
-□ User can upload image via drag & drop                              [ ]
-□ User can upload image via file picker                              [ ]
+✅ User can upload image via drag & drop                             [x]
+✅ User can upload image via file picker                             [x]
 □ User can capture photo from camera                                 [ ]
-□ Image displays correctly with aspect ratio preserved               [ ]
-□ RGB Shift effect applies in real-time                              [ ]
-□ Pixel Sort effect applies in real-time                             [ ]
-□ Effect parameters adjustable via sliders                           [ ]
-□ Multiple effects can be stacked                                    [ ]
-□ User can export as PNG                                             [ ]
+✅ Image displays correctly with aspect ratio preserved              [x]
+✅ RGB Shift effect applies in real-time                             [x]
+✅ Pixel Sort effect applies in real-time                            [x]
+✅ Effect parameters adjustable via sliders                          [x]
+✅ Multiple effects can be stacked                                   [x]
+□ User can export as PNG (TBD)                                       [ ]
 □ User can export as JPEG with quality control                       [ ]
 
 PERFORMANCE                                                          TARGET

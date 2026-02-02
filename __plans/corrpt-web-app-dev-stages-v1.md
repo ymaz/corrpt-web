@@ -142,12 +142,13 @@ STAGE 3: EFFECT SYSTEM                                       [WEEK 3]
   │ PHASE 3.3: Pixel Sort Effect                          [Days 5-6]   │
   ├────────────────────────────────────────────────────────────────────┤
   │                                                                    │
-  │  □ Research GPU pixel sort techniques                              │
-  │  □ Implement brightness threshold detection                        │
-  │  □ Write directional blur shader                                   │
-  │  □ Create PixelSortEffect processor class                          │
-  │  □ Tune threshold parameters                                       │
-  │  □ Add direction parameter (H/V)                                   │
+  │  ✅ Research GPU pixel sort techniques                              │
+  │  ✅ Implement brightness threshold detection                       │
+  │  ✅ Write directional blur shader                                  │
+  │  ✅ Create pixelSort effect definition (self-registering)          │
+  │  ✅ Tune threshold parameters (threshold, upperThreshold, spread)  │
+  │  ✅ Add direction parameter (H/V)                                  │
+  │  ✅ Playwright E2E tests (30 assertions across effect pipeline)    │
   │                                                                    │
   │  Deliverable: Working pixel sort effect                            │
   └────────────────────────────────────────────────────────────────────┘
