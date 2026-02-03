@@ -157,20 +157,19 @@ STAGE 3: EFFECT SYSTEM                                       [WEEK 3]
   │ PHASE 3.4: CRT Effect                                    [Day 7]   │
   ├────────────────────────────────────────────────────────────────────┤
   │                                                                    │
-  │  □ Write CRT fragment shader:                                      │
-  │    • Horizontal scanlines using sin/step on UV.y                   │
-  │    • Optional barrel distortion for screen curvature               │
+  │  ✅ Write CRT fragment shader:                                     │
+  │    • Horizontal scanlines using sin on UV.y                        │
+  │    • Barrel distortion for screen curvature (curveUV function)     │
   │    • Vignette darkening at edges                                   │
-  │    • Optional temporal flicker via u_time                          │
-  │  □ Create crt effect definition (self-registering)                 │
-  │  □ Define parameters:                                              │
+  │    • Out-of-bounds handling for curved edges (black fill)          │
+  │  ✅ Create crt effect definition (self-registering)                │
+  │  ✅ Define parameters:                                             │
   │    • lineIntensity (0-1): darkness of scanlines                    │
   │    • lineCount (100-800): number of scanlines                      │
   │    • curvature (0-0.5): barrel distortion amount                   │
   │    • vignette (0-1): edge darkening strength                       │
-  │    • flicker (bool): enable temporal flicker                       │
-  │  □ Test effect stacking with RGB Shift + Pixel Sort                │
-  │  □ Update effect definitions barrel export                         │
+  │  ✅ Test effect stacking with RGB Shift + Pixel Sort               │
+  │  ✅ Update effect definitions barrel export                        │
   │                                                                    │
   │  Deliverable: Working CRT/scanlines effect with retro aesthetic    │
   └────────────────────────────────────────────────────────────────────┘
@@ -179,21 +178,19 @@ STAGE 3: EFFECT SYSTEM                                       [WEEK 3]
   │ PHASE 3.5: Noise / Static Effect                         [Day 8]   │
   ├────────────────────────────────────────────────────────────────────┤
   │                                                                    │
-  │  □ Write noise fragment shader:                                    │
-  │    • Pseudo-random noise via fract(sin(dot(...)))                  │
-  │    • Mix noise with original image based on intensity              │
-  │    • Optional horizontal bar static (block noise)                  │
-  │    • Optional chromatic noise (different per RGB channel)          │
-  │    • Animate noise seed with u_time for motion                     │
-  │  □ Create noise effect definition (self-registering)               │
-  │  □ Define parameters:                                              │
-  │    • intensity (0-1): noise opacity/blend                          │
-  │    • scale (1-100): noise grain size                               │
-  │    • colored (bool): RGB vs monochrome noise                       │
-  │    • blockNoise (0-1): horizontal bar static amount                │
-  │    • animated (bool): enable temporal animation                    │
-  │  □ Test effect stacking with all other effects                     │
-  │  □ Update effect definitions barrel export                         │
+  │  ✅ Write noise fragment shader:                                   │
+  │    • Hash-based pseudo-random noise (arithmetic hash, GPU-stable)  │
+  │    • Additive noise blend with original image                      │
+  │    • Chromatic noise option (independent R/G/B channel noise)      │
+  │    • Seed parameter for reproducible/varied patterns               │
+  │  ✅ Create noise effect definition (self-registering)              │
+  │  ✅ Define parameters:                                             │
+  │    • intensity (0-1): noise strength                               │
+  │    • scale (1-100): grain coarseness (higher = coarser)            │
+  │    • seed (0-1000): pattern randomization                          │
+  │    • monochrome (bool): grayscale vs colored noise                 │
+  │  ✅ Test effect stacking with all other effects                    │
+  │  ✅ Update effect definitions barrel export                        │
   │                                                                    │
   │  Deliverable: Working noise/static effect for digital corruption   │
   └────────────────────────────────────────────────────────────────────┘
