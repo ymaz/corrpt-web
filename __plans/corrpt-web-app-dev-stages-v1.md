@@ -195,6 +195,105 @@ STAGE 3: EFFECT SYSTEM                                       [WEEK 3]
   │  Deliverable: Working noise/static effect for digital corruption   │
   └────────────────────────────────────────────────────────────────────┘
 
+  ┌────────────────────────────────────────────────────────────────────┐
+  │ PHASE 3.6: Slice/Shift Effect                           [Day 9]    │
+  ├────────────────────────────────────────────────────────────────────┤
+  │                                                                    │
+  │  □ Write slice/shift fragment shader:                              │
+  │    • Divide image into horizontal bands: floor(uv.y * sliceCount)  │
+  │    • Generate pseudo-random offset per slice using hash function   │
+  │    • Shift UV.x by offset (positive=right, negative=left)          │
+  │    • Threshold parameter to affect only some slices randomly       │
+  │  □ Create sliceShift effect definition (self-registering)          │
+  │  □ Define parameters:                                              │
+  │    • intensity (0-1): maximum horizontal displacement              │
+  │    • sliceCount (5-100): number of horizontal bands                │
+  │    • sliceFill (0-1): percentage of slices that shift              │
+  │    • seed (0-1000): randomization seed                             │
+  │  □ Test effect stacking (pairs well with RGB Shift, CRT, Noise)    │
+  │  □ Update effect definitions barrel export                         │
+  │                                                                    │
+  │  Algorithm: Classic "broken TV signal" displacement                │
+  │  Reference: halisavakis.com/my-take-on-shaders-glitch-image-effect │
+  │                                                                    │
+  │  Deliverable: Horizontal slice displacement for glitch aesthetic   │
+  └────────────────────────────────────────────────────────────────────┘
+
+  ┌────────────────────────────────────────────────────────────────────┐
+  │ PHASE 3.7: Block Glitch Effect                         [Day 10]    │
+  ├────────────────────────────────────────────────────────────────────┤
+  │                                                                    │
+  │  □ Write block glitch fragment shader:                             │
+  │    • Define grid: floor(uv * gridSize) / gridSize                  │
+  │    • Generate random offset per block using block coords as seed   │
+  │    • Apply XY offset to UV within block boundaries                 │
+  │    • Optional: tint displaced blocks with RGB channel bias         │
+  │  □ Create blockGlitch effect definition (self-registering)         │
+  │  □ Define parameters:                                              │
+  │    • intensity (0-1): maximum block displacement                   │
+  │    • gridSizeX (2-32): horizontal block count                      │
+  │    • gridSizeY (4-64): vertical block count                        │
+  │    • threshold (0-1): percentage of blocks that displace           │
+  │    • seed (0-1000): randomization seed                             │
+  │  □ Test effect stacking (pairs well with Noise, RGB Shift)         │
+  │  □ Update effect definitions barrel export                         │
+  │                                                                    │
+  │  Algorithm: Rectangular block displacement using SDF or grid UV    │
+  │  Reference: agatedragon.blog/2023/12/21/glitch-shader-blocks       │
+  │                                                                    │
+  │  Deliverable: Block-based displacement for digital corruption      │
+  └────────────────────────────────────────────────────────────────────┘
+
+  ┌────────────────────────────────────────────────────────────────────┐
+  │ PHASE 3.8: Smear Effect                                [Day 11]    │
+  ├────────────────────────────────────────────────────────────────────┤
+  │                                                                    │
+  │  □ Write smear fragment shader:                                    │
+  │    • Sample pixels along horizontal/vertical scanline              │
+  │    • Detect brightness threshold crossings (edge detection)        │
+  │    • At threshold boundaries, stretch pixels by repeating UVs      │
+  │    • Falloff parameter controls smear fade distance                │
+  │  □ Create smear effect definition (self-registering)               │
+  │  □ Define parameters:                                              │
+  │    • intensity (0-1): smear length / stretch amount                │
+  │    • threshold (0-1): brightness threshold for smear trigger       │
+  │    • direction (0-1): 0=horizontal, 1=vertical                     │
+  │    • falloff (0-1): how quickly smear fades                        │
+  │    • seed (0-1000): randomization for smear origins                │
+  │  □ Test effect stacking (pairs well with Pixel Sort, RGB Shift)    │
+  │  □ Update effect definitions barrel export                         │
+  │                                                                    │
+  │  Algorithm: Single-frame datamosh approximation via pixel stretch  │
+  │  Reference: github.com/cacheflowe/haxademic (pseudo-pixel-sorting) │
+  │  Note: True datamosh requires frame history; this is single-frame  │
+  │                                                                    │
+  │  Deliverable: Pixel smearing for organic/fluid corruption          │
+  └────────────────────────────────────────────────────────────────────┘
+
+  ┌────────────────────────────────────────────────────────────────────┐
+  │ PHASE 3.9: Vertical Tear Effect                        [Day 12]    │
+  ├────────────────────────────────────────────────────────────────────┤
+  │                                                                    │
+  │  □ Write vertical tear fragment shader:                            │
+  │    • Divide image into vertical columns: floor(uv.x * columnCount) │
+  │    • Generate random vertical offset per column                    │
+  │    • Shift UV.y by offset (up/down displacement)                   │
+  │    • Threshold parameter to affect only some columns randomly      │
+  │  □ Create verticalTear effect definition (self-registering)        │
+  │  □ Define parameters:                                              │
+  │    • intensity (0-1): maximum vertical displacement                │
+  │    • columnCount (5-100): number of vertical bands                 │
+  │    • columnFill (0-1): percentage of columns that shift            │
+  │    • seed (0-1000): randomization seed                             │
+  │  □ Test effect stacking (pairs with Slice/Shift for cross-hatch)   │
+  │  □ Update effect definitions barrel export                         │
+  │                                                                    │
+  │  Algorithm: Perpendicular complement to horizontal Slice/Shift     │
+  │  Stacking: Slice/Shift + Vertical Tear = grid-like destruction     │
+  │                                                                    │
+  │  Deliverable: Vertical displacement for "torn paper" aesthetic     │
+  └────────────────────────────────────────────────────────────────────┘
+
 
 STAGE 4: USER INTERFACE                                      [WEEK 4]
 ═══════════════════════════════════════════════════════════════════════

@@ -252,10 +252,12 @@ The project follows a 5-stage development plan:
 2. **Input System** (Week 2): File upload and camera capture
    - Phase 2.1: File upload + drag-and-drop — **DONE**
    - Phase 2.2: Camera capture — pending
-3. **Effect System** (Week 3): Effect architecture, RGB Shift, Pixel Sort
+3. **Effect System** (Week 3): Effect architecture, RGB Shift, Pixel Sort, CRT, Noise
    - Phase 3.1: Effect architecture (pipeline, registry, definitions) — **DONE**
    - Phase 3.2: RGB Shift effect + dev controls — **DONE**
-   - Phase 3.3: Pixel Sort effect — next
+   - Phase 3.3: Pixel Sort effect — **DONE**
+   - Phase 3.4: CRT effect — **DONE**
+   - Phase 3.5: Noise effect — **DONE**
 4. **User Interface** (Week 4): Layout, effect controls, visual polish
 5. **Export & Finishing** (Week 5): Export system, testing, deployment
 
