@@ -153,6 +153,51 @@ STAGE 3: EFFECT SYSTEM                                       [WEEK 3]
   │  Deliverable: Working pixel sort effect                            │
   └────────────────────────────────────────────────────────────────────┘
 
+  ┌────────────────────────────────────────────────────────────────────┐
+  │ PHASE 3.4: CRT Effect                                    [Day 7]   │
+  ├────────────────────────────────────────────────────────────────────┤
+  │                                                                    │
+  │  □ Write CRT fragment shader:                                      │
+  │    • Horizontal scanlines using sin/step on UV.y                   │
+  │    • Optional barrel distortion for screen curvature               │
+  │    • Vignette darkening at edges                                   │
+  │    • Optional temporal flicker via u_time                          │
+  │  □ Create crt effect definition (self-registering)                 │
+  │  □ Define parameters:                                              │
+  │    • lineIntensity (0-1): darkness of scanlines                    │
+  │    • lineCount (100-800): number of scanlines                      │
+  │    • curvature (0-0.5): barrel distortion amount                   │
+  │    • vignette (0-1): edge darkening strength                       │
+  │    • flicker (bool): enable temporal flicker                       │
+  │  □ Test effect stacking with RGB Shift + Pixel Sort                │
+  │  □ Update effect definitions barrel export                         │
+  │                                                                    │
+  │  Deliverable: Working CRT/scanlines effect with retro aesthetic    │
+  └────────────────────────────────────────────────────────────────────┘
+
+  ┌────────────────────────────────────────────────────────────────────┐
+  │ PHASE 3.5: Noise / Static Effect                         [Day 8]   │
+  ├────────────────────────────────────────────────────────────────────┤
+  │                                                                    │
+  │  □ Write noise fragment shader:                                    │
+  │    • Pseudo-random noise via fract(sin(dot(...)))                  │
+  │    • Mix noise with original image based on intensity              │
+  │    • Optional horizontal bar static (block noise)                  │
+  │    • Optional chromatic noise (different per RGB channel)          │
+  │    • Animate noise seed with u_time for motion                     │
+  │  □ Create noise effect definition (self-registering)               │
+  │  □ Define parameters:                                              │
+  │    • intensity (0-1): noise opacity/blend                          │
+  │    • scale (1-100): noise grain size                               │
+  │    • colored (bool): RGB vs monochrome noise                       │
+  │    • blockNoise (0-1): horizontal bar static amount                │
+  │    • animated (bool): enable temporal animation                    │
+  │  □ Test effect stacking with all other effects                     │
+  │  □ Update effect definitions barrel export                         │
+  │                                                                    │
+  │  Deliverable: Working noise/static effect for digital corruption   │
+  └────────────────────────────────────────────────────────────────────┘
+
 
 STAGE 4: USER INTERFACE                                      [WEEK 4]
 ═══════════════════════════════════════════════════════════════════════
