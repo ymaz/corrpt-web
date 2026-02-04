@@ -1,5 +1,7 @@
 # Corrpt
 
+[![License: Polyform Noncommercial](https://img.shields.io/badge/License-Polyform%20NC%201.0.0-lightgrey.svg)](LICENSE.md)
+
 A client-side web app for applying real-time glitch and distortion effects to images. Inspired by the Glitche iOS app.
 
 ## Features
