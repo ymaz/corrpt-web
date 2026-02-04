@@ -31,7 +31,7 @@ const crt: EffectDefinition = {
 		{
 			name: "curvature",
 			type: "float",
-			default: 0.1,
+			default: 0,
 			min: 0,
 			max: 0.5,
 			step: 0.01,
