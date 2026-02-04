@@ -8,6 +8,8 @@ export const useImageStore = create<ImageStore>((set, get) => ({
 	texture: null,
 	dimensions: null,
 	originalDataUrl: null,
+	fileName: null,
+	mimeType: null,
 	isLoading: false,
 	error: null,
 
@@ -20,6 +22,8 @@ export const useImageStore = create<ImageStore>((set, get) => ({
 			texture: null,
 			dimensions: null,
 			originalDataUrl: null,
+			fileName: null,
+			mimeType: null,
 			isLoading: false,
 			error: null,
 		});
@@ -39,6 +43,10 @@ export const useImageStore = create<ImageStore>((set, get) => ({
 			});
 			return;
 		}
+
+		// Extract filename without extension
+		const lastDot = file.name.lastIndexOf(".");
+		const baseName = lastDot > 0 ? file.name.slice(0, lastDot) : file.name;
 
 		// Dispose previous texture and reset state
 		get().clearImage();
@@ -64,6 +72,8 @@ export const useImageStore = create<ImageStore>((set, get) => ({
 					texture: tex,
 					dimensions: { width: img.width, height: img.height },
 					originalDataUrl: dataUrl,
+					fileName: baseName,
+					mimeType: file.type,
 					isLoading: false,
 				});
 			};

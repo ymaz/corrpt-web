@@ -6,6 +6,7 @@ export const DROPZONE_LANDING = "dropzone-landing";
 export const LANDING_FILE_INPUT = "landing-file-input";
 export const REPLACE_IMAGE_BUTTON = "replace-image-button";
 export const REPLACE_FILE_INPUT = "replace-file-input";
+export const DOWNLOAD_BUTTON = "download-button";
 export const IMAGE_ERROR = "image-error";
 
 // Effect dev panel

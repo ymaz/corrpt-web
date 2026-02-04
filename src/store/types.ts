@@ -15,6 +15,8 @@ export interface ImageState {
 	texture: THREE.Texture | null;
 	dimensions: ImageDimensions | null;
 	originalDataUrl: string | null;
+	fileName: string | null;
+	mimeType: string | null;
 	isLoading: boolean;
 	error: string | null;
 }
