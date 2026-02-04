@@ -199,19 +199,20 @@ STAGE 3: EFFECT SYSTEM                                       [WEEK 3]
   │ PHASE 3.6: Slice/Shift Effect                           [Day 9]    │
   ├────────────────────────────────────────────────────────────────────┤
   │                                                                    │
-  │  □ Write slice/shift fragment shader:                              │
+  │  ✅ Write slice/shift fragment shader:                              │
   │    • Divide image into horizontal bands: floor(uv.y * sliceCount)  │
   │    • Generate pseudo-random offset per slice using hash function   │
   │    • Shift UV.x by offset (positive=right, negative=left)          │
   │    • Threshold parameter to affect only some slices randomly       │
-  │  □ Create sliceShift effect definition (self-registering)          │
-  │  □ Define parameters:                                              │
+  │  ✅ Create sliceShift effect definition (self-registering)          │
+  │  ✅ Define parameters:                                              │
   │    • intensity (0-1): maximum horizontal displacement              │
   │    • sliceCount (5-100): number of horizontal bands                │
   │    • sliceFill (0-1): percentage of slices that shift              │
   │    • seed (0-1000): randomization seed                             │
-  │  □ Test effect stacking (pairs well with RGB Shift, CRT, Noise)    │
-  │  □ Update effect definitions barrel export                         │
+  │    • vertical (bool): vertical slices instead of horizontal        │
+  │  ✅ Test effect stacking (pairs well with RGB Shift, CRT, Noise)    │
+  │  ✅ Update effect definitions barrel export                         │
   │                                                                    │
   │  Algorithm: Classic "broken TV signal" displacement                │
   │  Reference: halisavakis.com/my-take-on-shaders-glitch-image-effect │
@@ -248,24 +249,23 @@ STAGE 3: EFFECT SYSTEM                                       [WEEK 3]
   │ PHASE 3.8: Smear Effect                                [Day 11]    │
   ├────────────────────────────────────────────────────────────────────┤
   │                                                                    │
-  │  □ Write smear fragment shader:                                    │
-  │    • Sample pixels along horizontal/vertical scanline              │
-  │    • Detect brightness threshold crossings (edge detection)        │
-  │    • At threshold boundaries, stretch pixels by repeating UVs      │
-  │    • Falloff parameter controls smear fade distance                │
-  │  □ Create smear effect definition (self-registering)               │
-  │  □ Define parameters:                                              │
-  │    • intensity (0-1): smear length / stretch amount                │
-  │    • threshold (0-1): brightness threshold for smear trigger       │
-  │    • direction (0-1): 0=horizontal, 1=vertical                     │
-  │    • falloff (0-1): how quickly smear fades                        │
-  │    • seed (0-1000): randomization for smear origins                │
-  │  □ Test effect stacking (pairs well with Pixel Sort, RGB Shift)    │
-  │  □ Update effect definitions barrel export                         │
+  │  ✅ Write smear fragment shader:                                    │
+  │    • Bright pixels (above threshold) stay intact as "sources"      │
+  │    • Dark pixels look backward for bright source pixel             │
+  │    • Propagate source color into dark areas (directional streaks)  │
+  │    • Per-scanline randomization for organic variation              │
+  │  ✅ Create smear effect definition (self-registering)               │
+  │  ✅ Define parameters:                                              │
+  │    • intensity (0-1): smear length (max 150 pixels)                │
+  │    • threshold (0-1): brightness threshold for smear sources       │
+  │    • falloff (0-1): edge hardness (0=hard, 1=soft gradient)        │
+  │    • seed (0-1000): per-scanline randomization                     │
+  │    • vertical (bool): vertical smear instead of horizontal         │
+  │  ✅ Test effect stacking (pairs well with Pixel Sort, RGB Shift)    │
+  │  ✅ Update effect definitions barrel export                         │
   │                                                                    │
-  │  Algorithm: Single-frame datamosh approximation via pixel stretch  │
-  │  Reference: github.com/cacheflowe/haxademic (pseudo-pixel-sorting) │
-  │  Note: True datamosh requires frame history; this is single-frame  │
+  │  Algorithm: Brightness-based color propagation (datamosh approx)   │
+  │  Note: Distinct from Pixel Sort — propagates vs blurs/averages     │
   │                                                                    │
   │  Deliverable: Pixel smearing for organic/fluid corruption          │
   └────────────────────────────────────────────────────────────────────┘
