@@ -6,6 +6,7 @@ import glsl from "vite-plugin-glsl";
 
 // https://vite.dev/config/
 export default defineConfig({
+	base: process.env.GITHUB_ACTIONS ? "/corrpt-web/" : "/",
 	plugins: [
 		react(),
 		tailwindcss(),
