@@ -2,7 +2,11 @@
 
 [![License: Polyform Noncommercial](https://img.shields.io/badge/License-Polyform%20NC%201.0.0-lightgrey.svg)](LICENSE.md)
 
-A client-side web app for applying real-time glitch and distortion effects to images. Inspired by the Glitche iOS app.
+> Destroy pixels. Perfectly corrupted.
+
+A client-side web app for applying real-time glitch and distortion effects to images. Create corrupted art on your device - **offline, no server, no tokens**. Only you in charge. Inspired by the Glitche iOS app. Born on the web.
+
+[Try it out](https://ymaz.github.io/corrpt-web/)
 
 ## Features
 
