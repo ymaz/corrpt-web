@@ -5,6 +5,7 @@ import * as THREE from "three";
 import "@/components/canvas/EffectMaterial";
 import { renderEffectChain } from "@/effects/renderEffectChain";
 import { useEffectStore } from "@/store/effectStore";
+import { useImageStore } from "@/store/imageStore";
 
 interface EffectPipelineProps {
 	texture: THREE.Texture;
@@ -14,9 +15,11 @@ export function EffectPipeline({ texture }: EffectPipelineProps) {
 	const materialRef = useRef<THREE.ShaderMaterial>(null);
 	const { viewport, gl } = useThree();
 
-	const image = texture.image as HTMLImageElement;
-	const imageWidth = image.width;
-	const imageHeight = image.height;
+	// dimensions is always set in the same set() call as texture, and this
+	// component only renders when texture exists (guarded by parent)
+	const { width: imageWidth, height: imageHeight } = useImageStore(
+		(s) => s.dimensions,
+	) as { width: number; height: number };
 	const imageAspect = imageWidth / imageHeight;
 	const viewportAspect = viewport.width / viewport.height;
 

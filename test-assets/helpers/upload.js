@@ -1,7 +1,7 @@
 import {
 	LANDING_FILE_INPUT,
 	REPLACE_FILE_INPUT,
-} from "../../src/lib/test-ids.js";
+} from "../../src/lib/test-ids.ts";
 
 /**
  * Upload an image via the landing page file input.

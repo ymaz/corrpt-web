@@ -4,24 +4,29 @@ import { create } from "zustand";
 import { MAX_FILE_SIZE, SUPPORTED_IMAGE_TYPES } from "@/lib/constants";
 import type { ImageStore } from "@/store/types";
 
+let loadGeneration = 0;
+
 export const useImageStore = create<ImageStore>((set, get) => ({
 	texture: null,
 	dimensions: null,
-	originalDataUrl: null,
+	originalUrl: null,
 	fileName: null,
 	mimeType: null,
 	isLoading: false,
 	error: null,
 
 	clearImage: () => {
-		const { texture } = get();
+		const { texture, originalUrl } = get();
 		if (texture) {
 			texture.dispose();
+		}
+		if (originalUrl) {
+			URL.revokeObjectURL(originalUrl);
 		}
 		set({
 			texture: null,
 			dimensions: null,
-			originalDataUrl: null,
+			originalUrl: null,
 			fileName: null,
 			mimeType: null,
 			isLoading: false,
@@ -52,43 +57,40 @@ export const useImageStore = create<ImageStore>((set, get) => ({
 		get().clearImage();
 		set({ isLoading: true, error: null });
 
-		const reader = new FileReader();
+		loadGeneration++;
+		const gen = loadGeneration;
 
-		reader.onload = () => {
-			const dataUrl = reader.result as string;
-			// EXIF orientation is applied natively by target browsers
-			// (Chrome 81+, Firefox 77+, Safari 14+) during HTMLImageElement
-			// decode, so img.width/height and pixel data are already rotated.
-			const img = new Image();
+		const objectUrl = URL.createObjectURL(file);
+		// EXIF orientation is applied natively by target browsers
+		// (Chrome 81+, Firefox 77+, Safari 14+) during HTMLImageElement
+		// decode, so img.width/height and pixel data are already rotated.
+		const img = new Image();
 
-			img.onload = () => {
-				const tex = new THREE.Texture(img);
-				tex.needsUpdate = true;
-				tex.colorSpace = THREE.NoColorSpace;
-				tex.minFilter = THREE.LinearFilter;
-				tex.magFilter = THREE.LinearFilter;
+		img.onload = () => {
+			if (gen !== loadGeneration) return;
 
-				set({
-					texture: tex,
-					dimensions: { width: img.width, height: img.height },
-					originalDataUrl: dataUrl,
-					fileName: baseName,
-					mimeType: file.type,
-					isLoading: false,
-				});
-			};
+			const tex = new THREE.Texture(img);
+			tex.needsUpdate = true;
+			tex.colorSpace = THREE.NoColorSpace;
+			tex.minFilter = THREE.LinearFilter;
+			tex.magFilter = THREE.LinearFilter;
 
-			img.onerror = () => {
-				set({ error: "Failed to decode image.", isLoading: false });
-			};
-
-			img.src = dataUrl;
+			set({
+				texture: tex,
+				dimensions: { width: img.width, height: img.height },
+				originalUrl: objectUrl,
+				fileName: baseName,
+				mimeType: file.type,
+				isLoading: false,
+			});
 		};
 
-		reader.onerror = () => {
-			set({ error: "Failed to read file.", isLoading: false });
+		img.onerror = () => {
+			if (gen !== loadGeneration) return;
+			URL.revokeObjectURL(objectUrl);
+			set({ error: "Failed to decode image.", isLoading: false });
 		};
 
-		reader.readAsDataURL(file);
+		img.src = objectUrl;
 	},
 }));

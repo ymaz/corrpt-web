@@ -8,11 +8,13 @@ uniform float u_direction;
 
 varying vec2 vUv;
 
+#include ../common/utils.glsl;
+
 const int SAMPLES = 16;
 
 void main() {
   vec4 original = texture2D(u_texture, vUv);
-  float brightness = dot(original.rgb, vec3(0.299, 0.587, 0.114));
+  float brightness = getBrightness(original.rgb);
 
   if (brightness >= u_threshold && brightness <= u_upperThreshold) {
     vec2 dir = mix(vec2(1.0, 0.0), vec2(0.0, 1.0), u_direction);

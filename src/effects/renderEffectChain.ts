@@ -1,12 +1,13 @@
 import * as THREE from "three";
 
 import { getEffect } from "@/effects/registry";
+import type { EffectParameterValue } from "@/effects/types";
 
 export interface RenderChainParams {
 	gl: THREE.WebGLRenderer;
 	texture: THREE.Texture;
 	activeEffects: string[];
-	parameters: Record<string, Record<string, number | boolean>>;
+	parameters: Record<string, Record<string, EffectParameterValue>>;
 	fbos: readonly [THREE.WebGLRenderTarget, THREE.WebGLRenderTarget];
 	offScreen: { scene: THREE.Scene; camera: THREE.Camera; mesh: THREE.Mesh };
 	materialCache: Map<string, THREE.ShaderMaterial>;
@@ -49,9 +50,34 @@ export function renderEffectChain(params: RenderChainParams): THREE.Texture {
 			};
 			for (const p of def.parameters) {
 				const uniformName = `u_${p.name}`;
-				uniforms[uniformName] = {
-					value: p.type === "bool" ? (p.default ? 1.0 : 0.0) : p.default,
-				};
+				switch (p.type) {
+					case "bool":
+						uniforms[uniformName] = { value: p.default ? 1.0 : 0.0 };
+						break;
+					case "int":
+					case "float":
+						uniforms[uniformName] = { value: p.default };
+						break;
+					case "enum": {
+						const idx = p.options.findIndex((o) => o.value === p.default);
+						uniforms[uniformName] = { value: idx >= 0 ? idx : 0 };
+						break;
+					}
+					case "vec2":
+						uniforms[uniformName] = {
+							value: new THREE.Vector2(p.default[0], p.default[1]),
+						};
+						break;
+					case "color":
+						uniforms[uniformName] = {
+							value: new THREE.Vector3(
+								p.default[0],
+								p.default[1],
+								p.default[2],
+							),
+						};
+						break;
+				}
 			}
 			mat = new THREE.ShaderMaterial({
 				vertexShader: def.vertexShader,
@@ -72,11 +98,36 @@ export function renderEffectChain(params: RenderChainParams): THREE.Texture {
 		if (effectParams && def.parameters.length > 0) {
 			for (const p of def.parameters) {
 				const uniformName = `u_${p.name}`;
-				if (uniformName in mat.uniforms) {
-					const val = effectParams[p.name];
-					if (val !== undefined) {
-						mat.uniforms[uniformName].value =
-							p.type === "bool" ? (val ? 1.0 : 0.0) : val;
+				if (!(uniformName in mat.uniforms)) continue;
+				const val = effectParams[p.name];
+				if (val === undefined) continue;
+
+				switch (p.type) {
+					case "bool":
+						mat.uniforms[uniformName].value = val ? 1.0 : 0.0;
+						break;
+					case "int":
+					case "float":
+						mat.uniforms[uniformName].value = val;
+						break;
+					case "enum": {
+						const idx = p.options.findIndex((o) => o.value === val);
+						mat.uniforms[uniformName].value = idx >= 0 ? idx : 0;
+						break;
+					}
+					case "vec2": {
+						const v = val as [number, number];
+						(mat.uniforms[uniformName].value as THREE.Vector2).set(v[0], v[1]);
+						break;
+					}
+					case "color": {
+						const c = val as [number, number, number];
+						(mat.uniforms[uniformName].value as THREE.Vector3).set(
+							c[0],
+							c[1],
+							c[2],
+						);
+						break;
 					}
 				}
 			}

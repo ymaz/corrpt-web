@@ -12,10 +12,10 @@ interface EffectCanvasProps {
 
 export function EffectCanvas({ className }: EffectCanvasProps) {
 	const texture = useImageStore((s) => s.texture);
-	const originalDataUrl = useImageStore((s) => s.originalDataUrl);
+	const originalUrl = useImageStore((s) => s.originalUrl);
 
 	return (
-		<CanvasErrorBoundary resetKey={originalDataUrl}>
+		<CanvasErrorBoundary resetKey={originalUrl}>
 			<Canvas
 				className={className}
 				orthographic

@@ -15,7 +15,7 @@ import {
 	paramBool,
 	paramSlider,
 	paramValue,
-} from "../src/lib/test-ids.js";
+} from "../src/lib/test-ids.ts";
 import { createReporter, errorsSince } from "./helpers/assert.js";
 import { closeBrowser, createBrowser } from "./helpers/browser.js";
 import { startDevServer, stopServer } from "./helpers/server.js";

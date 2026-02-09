@@ -61,7 +61,7 @@ Each effect:
 - Final pass renders to screen canvas
 
 **Key Modules (Implemented — Phase 3.1):**
-- `EffectDefinition` + `EffectParameterDef`: TypeScript interfaces defining effect metadata, shaders, and parameters (`src/effects/types.ts`)
+- `EffectDefinition` + `EffectParameterDef`: TypeScript interfaces defining effect metadata, shaders, and parameters — supports float, bool, int, enum, vec2, color types (`src/effects/types.ts`)
 - `EffectRegistry`: Map-based registry with `registerEffect()`, `getEffect()`, `getAllEffects()` (`src/effects/registry.ts`)
 - `EffectPipeline`: R3F component managing multi-pass FBO rendering, material caching, and per-frame uniform updates (`src/components/canvas/EffectPipeline.tsx`)
 - Effect definitions: Self-registering modules in `src/effects/definitions/` — imported via barrel at canvas mount
@@ -73,7 +73,9 @@ The store is organized into three slices:
 **imageStore**:
 - `texture`: THREE.Texture | null
 - `dimensions`: { width, height }
-- `originalDataUrl`: string | null
+- `originalUrl`: string | null (Object URL)
+- `fileName`: string | null
+- `mimeType`: string | null
 - `isLoading`, `error`
 
 **effectStore**:
@@ -110,7 +112,7 @@ All effect shaders share the vertex shader `src/effects/shaders/common/passthrou
 `imageStore.loadImage()` (`src/store/imageStore.ts`) manages the File → THREE.Texture pipeline in Zustand global state.
 
 - Validates file type (`SUPPORTED_IMAGE_TYPES`) and size (`MAX_FILE_SIZE` = 50MB)
-- Pipeline: `File → FileReader → HTMLImageElement → THREE.Texture`
+- Pipeline: `File → URL.createObjectURL → HTMLImageElement → THREE.Texture`
 - Texture config: `needsUpdate`, `NoColorSpace`, `LinearFilter` min/mag
 - Disposes texture on `clearImage()` and on new image load
 - Legacy `useImageLoader` hook still exists at `src/hooks/useImageLoader.ts` (unused, kept for reference)
@@ -150,7 +152,8 @@ src/
 │   ├── shaders/
 │   │   ├── common/
 │   │   │   ├── passthrough.vert  # [1.2] Standard vertex shader (shared by all effects)
-│   │   │   └── passthrough.frag  # [1.2] Identity fragment shader
+│   │   │   ├── passthrough.frag  # [1.2] Identity fragment shader
+│   │   │   └── utils.glsl        # Shared GLSL utilities (hash, rand) via #include
 │   │   └── rgb-shift/
 │   │       └── fragment.glsl     # [3.2] RGB channel separation + directional offset
 │   ├── registry.ts           # [3.1] Map-based effect registry (registerEffect/getEffect/getAllEffects)
@@ -225,7 +228,7 @@ Convention: parameter name `foo` maps to uniform `u_foo`. Bool parameters are se
 
 ### Image Loading Pipeline (Implemented — Phase 1.2, migrated Phase 1.3)
 
-File → FileReader → HTMLImageElement → THREE.Texture (in `imageStore.loadImage()`)
+File → URL.createObjectURL → HTMLImageElement → THREE.Texture (in `imageStore.loadImage()`)
 
 - Validates file type (JPEG/PNG/WebP) and size (max 50MB)
 - Texture config: `needsUpdate`, `NoColorSpace`, `LinearFilter`

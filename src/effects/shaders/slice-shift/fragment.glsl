@@ -10,12 +10,7 @@ uniform float u_vertical;     // 0 or 1: vertical slices instead of horizontal
 
 varying vec2 vUv;
 
-// Pseudo-random hash function (same as noise effect)
-float hash(vec2 p) {
-  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
-  p3 += dot(p3, p3.yzx + 33.33);
-  return fract((p3.x + p3.y) * p3.z);
-}
+#include ../common/utils.glsl;
 
 void main() {
   vec2 uv = vUv;

@@ -1,5 +1,7 @@
 import type * as THREE from "three";
 
+import type { EffectParameterValue } from "@/effects/types";
+
 // Shared type aliases
 export type PreviewMode = "split" | "full" | "compare";
 export type ModalType = "export" | "camera" | "source";
@@ -14,7 +16,7 @@ export interface ImageDimensions {
 export interface ImageState {
 	texture: THREE.Texture | null;
 	dimensions: ImageDimensions | null;
-	originalDataUrl: string | null;
+	originalUrl: string | null;
 	fileName: string | null;
 	mimeType: string | null;
 	isLoading: boolean;
@@ -31,7 +33,7 @@ export type ImageStore = ImageState & ImageActions;
 // Effect store
 export interface EffectState {
 	activeEffects: string[];
-	parameters: Record<string, Record<string, number | boolean>>;
+	parameters: Record<string, Record<string, EffectParameterValue>>;
 	previewMode: PreviewMode;
 }
 
@@ -41,7 +43,7 @@ export interface EffectActions {
 	setEffectParam: (
 		effectId: string,
 		paramName: string,
-		value: number | boolean,
+		value: EffectParameterValue,
 	) => void;
 	reorderEffects: (effectIds: string[]) => void;
 	setPreviewMode: (mode: PreviewMode) => void;

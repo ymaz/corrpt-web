@@ -10,15 +10,7 @@ uniform float u_seed;        // 0-1000: randomization seed
 
 varying vec2 vUv;
 
-float hash(vec2 p) {
-  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
-  p3 += dot(p3, p3.yzx + 33.33);
-  return fract((p3.x + p3.y) * p3.z);
-}
-
-float getBrightness(vec3 color) {
-  return dot(color, vec3(0.299, 0.587, 0.114));
-}
+#include ../common/utils.glsl;
 
 void main() {
   vec4 original = texture2D(u_texture, vUv);

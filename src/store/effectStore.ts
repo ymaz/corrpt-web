@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 import { getEffect } from "@/effects/registry";
+import type { EffectParameterValue } from "@/effects/types";
 import type { EffectStore } from "@/store/types";
 
 export const useEffectStore = create<EffectStore>((set, get) => ({
@@ -12,7 +13,7 @@ export const useEffectStore = create<EffectStore>((set, get) => ({
 		const { activeEffects } = get();
 		if (activeEffects.includes(id)) return;
 		const def = getEffect(id);
-		const defaults: Record<string, number | boolean> = {};
+		const defaults: Record<string, EffectParameterValue> = {};
 		if (def) {
 			for (const p of def.parameters) {
 				defaults[p.name] = p.default;
@@ -36,9 +37,10 @@ export const useEffectStore = create<EffectStore>((set, get) => ({
 	setEffectParam: (
 		effectId: string,
 		paramName: string,
-		value: number | boolean,
+		value: EffectParameterValue,
 	) => {
 		const { parameters } = get();
+		if (!parameters[effectId]) return;
 		set({
 			parameters: {
 				...parameters,

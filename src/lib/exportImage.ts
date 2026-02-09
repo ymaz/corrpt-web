@@ -3,13 +3,14 @@ import * as THREE from "three";
 import { renderEffectChain } from "@/effects/renderEffectChain";
 import passthroughFrag from "@/effects/shaders/common/passthrough.frag";
 import passthroughVert from "@/effects/shaders/common/passthrough.vert";
+import type { EffectParameterValue } from "@/effects/types";
 import { RENDERER_SETTINGS } from "@/lib/constants";
 
 export interface ExportOptions {
 	texture: THREE.Texture;
 	dimensions: { width: number; height: number };
 	activeEffects: string[];
-	parameters: Record<string, Record<string, number | boolean>>;
+	parameters: Record<string, Record<string, EffectParameterValue>>;
 	mimeType: string;
 	fileName: string;
 }
@@ -96,10 +97,22 @@ export function exportImage(options: ExportOptions): void {
 	const ext = MIME_TO_EXT[mimeType] || "png";
 	const quality = mimeType === "image/jpeg" ? 0.92 : undefined;
 
+	const cleanup = () => {
+		geometry.dispose();
+		displayMaterial.dispose();
+		for (const mat of materialCache.values()) {
+			mat.dispose();
+		}
+		fbo0.dispose();
+		fbo1.dispose();
+		renderer.dispose();
+	};
+
 	canvas.toBlob(
 		(blob) => {
 			if (!blob) {
 				console.error("Failed to create blob for export");
+				cleanup();
 				return;
 			}
 
@@ -109,20 +122,10 @@ export function exportImage(options: ExportOptions): void {
 			link.download = `${fileName}__corrpt.${ext}`;
 			link.click();
 
-			// Cleanup
 			URL.revokeObjectURL(url);
+			cleanup();
 		},
 		mimeType,
 		quality,
 	);
-
-	// Dispose Three.js resources
-	geometry.dispose();
-	displayMaterial.dispose();
-	for (const mat of materialCache.values()) {
-		mat.dispose();
-	}
-	fbo0.dispose();
-	fbo1.dispose();
-	renderer.dispose();
 }
