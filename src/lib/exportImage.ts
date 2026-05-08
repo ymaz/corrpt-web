@@ -3,14 +3,13 @@ import * as THREE from "three";
 import { renderEffectChain } from "@/effects/renderEffectChain";
 import passthroughFrag from "@/effects/shaders/common/passthrough.frag";
 import passthroughVert from "@/effects/shaders/common/passthrough.vert";
-import type { EffectParameterValue } from "@/effects/types";
+import type { EffectInstance } from "@/effects/types";
 import { RENDERER_SETTINGS } from "@/lib/constants";
 
 export interface ExportOptions {
 	texture: THREE.Texture;
 	dimensions: { width: number; height: number };
-	activeEffects: string[];
-	parameters: Record<string, Record<string, EffectParameterValue>>;
+	effects: readonly EffectInstance[];
 	mimeType: string;
 	fileName: string;
 }
@@ -25,9 +24,8 @@ const MIME_TO_EXT: Record<string, string> = {
  * Exports the current image with all active effects applied at full resolution.
  * Creates off-screen renderer, processes effects, and triggers download.
  */
-export function exportImage(options: ExportOptions): void {
-	const { texture, dimensions, activeEffects, parameters, mimeType, fileName } =
-		options;
+export function exportImage(options: ExportOptions): Promise<void> {
+	const { texture, dimensions, effects, mimeType, fileName } = options;
 	const { width, height } = dimensions;
 
 	// Create off-screen canvas and renderer
@@ -69,8 +67,7 @@ export function exportImage(options: ExportOptions): void {
 	const finalTexture = renderEffectChain({
 		gl: renderer,
 		texture,
-		activeEffects,
-		parameters,
+		effects,
 		fbos,
 		offScreen: { scene, camera, mesh },
 		materialCache,
@@ -108,24 +105,37 @@ export function exportImage(options: ExportOptions): void {
 		renderer.dispose();
 	};
 
-	canvas.toBlob(
-		(blob) => {
-			if (!blob) {
-				console.error("Failed to create blob for export");
-				cleanup();
-				return;
-			}
+	return new Promise((resolve, reject) => {
+		canvas.toBlob(
+			(blob) => {
+				if (!blob) {
+					cleanup();
+					reject(new Error("Failed to create blob for export"));
+					return;
+				}
 
-			const url = URL.createObjectURL(blob);
-			const link = document.createElement("a");
-			link.href = url;
-			link.download = `${fileName}__corrpt.${ext}`;
-			link.click();
+				const url = URL.createObjectURL(blob);
+				const link = document.createElement("a");
+				const baseName = fileName.replace(/\.[^/.]+$/, "");
 
-			URL.revokeObjectURL(url);
-			cleanup();
-		},
-		mimeType,
-		quality,
-	);
+				try {
+					link.href = url;
+					link.download = `${baseName}__corrpt.${ext}`;
+					document.body.appendChild(link);
+					link.click();
+					resolve();
+				} catch (error) {
+					reject(error);
+				} finally {
+					if (link.isConnected) {
+						document.body.removeChild(link);
+					}
+					URL.revokeObjectURL(url);
+					cleanup();
+				}
+			},
+			mimeType,
+			quality,
+		);
+	});
 }

@@ -1,13 +1,12 @@
 import * as THREE from "three";
 
 import { getEffect } from "@/effects/registry";
-import type { EffectParameterValue } from "@/effects/types";
+import type { EffectInstance } from "@/effects/types";
 
 export interface RenderChainParams {
 	gl: THREE.WebGLRenderer;
 	texture: THREE.Texture;
-	activeEffects: string[];
-	parameters: Record<string, Record<string, EffectParameterValue>>;
+	effects: readonly EffectInstance[];
 	fbos: readonly [THREE.WebGLRenderTarget, THREE.WebGLRenderTarget];
 	offScreen: { scene: THREE.Scene; camera: THREE.Camera; mesh: THREE.Mesh };
 	materialCache: Map<string, THREE.ShaderMaterial>;
@@ -23,8 +22,7 @@ export function renderEffectChain(params: RenderChainParams): THREE.Texture {
 	const {
 		gl,
 		texture,
-		activeEffects,
-		parameters,
+		effects,
 		fbos,
 		offScreen,
 		materialCache,
@@ -35,13 +33,14 @@ export function renderEffectChain(params: RenderChainParams): THREE.Texture {
 	let readIndex = 0;
 	let passCount = 0;
 
-	for (let i = 0; i < activeEffects.length; i++) {
-		const effectId = activeEffects[i];
-		const def = getEffect(effectId);
+	for (const effect of effects) {
+		if (!effect.enabled) continue;
+
+		const def = getEffect(effect.effectId);
 		if (!def) continue;
 
 		// Get or create cached material
-		let mat = materialCache.get(effectId);
+		let mat = materialCache.get(effect.instanceId);
 		if (!mat) {
 			const uniforms: Record<string, THREE.IUniform> = {
 				u_texture: { value: null },
@@ -84,7 +83,7 @@ export function renderEffectChain(params: RenderChainParams): THREE.Texture {
 				fragmentShader: def.fragmentShader,
 				uniforms,
 			});
-			materialCache.set(effectId, mat);
+			materialCache.set(effect.instanceId, mat);
 		}
 
 		// First actual pass reads original texture; subsequent read previous FBO
@@ -93,13 +92,12 @@ export function renderEffectChain(params: RenderChainParams): THREE.Texture {
 		mat.uniforms.u_resolution.value.copy(resolution);
 		mat.uniforms.u_time.value = time;
 
-		// Update effect-specific uniforms from store parameters
-		const effectParams = parameters[effectId];
-		if (effectParams && def.parameters.length > 0) {
+		// Update effect-specific uniforms from store instance parameters.
+		if (def.parameters.length > 0) {
 			for (const p of def.parameters) {
 				const uniformName = `u_${p.name}`;
 				if (!(uniformName in mat.uniforms)) continue;
-				const val = effectParams[p.name];
+				const val = effect.parameters[p.name];
 				if (val === undefined) continue;
 
 				switch (p.type) {
@@ -138,12 +136,13 @@ export function renderEffectChain(params: RenderChainParams): THREE.Texture {
 		offScreen.mesh.material = mat;
 		gl.setRenderTarget(fbos[writeIndex]);
 		gl.render(offScreen.scene, offScreen.camera);
-		gl.setRenderTarget(null);
 
 		// Swap for next pass
 		readIndex = writeIndex;
 		passCount++;
 	}
+
+	gl.setRenderTarget(null);
 
 	// Return final output texture (or original if all effects were skipped)
 	return passCount > 0 ? fbos[readIndex].texture : texture;

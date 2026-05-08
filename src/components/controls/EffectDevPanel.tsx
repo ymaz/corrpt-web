@@ -1,9 +1,12 @@
-import { useMemo } from "react";
+import { type ComponentType, useMemo } from "react";
 
 import { getAllEffects } from "@/effects/registry";
 import type { EffectParameterDef, EffectParameterValue } from "@/effects/types";
 import {
 	EFFECT_DEV_PANEL,
+	effectDuplicate,
+	effectInstance,
+	effectRemove,
 	effectSection,
 	effectToggle,
 	paramBool,
@@ -18,19 +21,19 @@ import { useEffectStore } from "@/store/effectStore";
 import { useImageStore } from "@/store/imageStore";
 
 interface ParamProps {
-	effectId: string;
+	instanceId: string;
 	param: EffectParameterDef;
 	value: EffectParameterValue;
 	onChange: (value: EffectParameterValue) => void;
 }
 
-function BoolParam({ effectId, param, value, onChange }: ParamProps) {
+function BoolParam({ instanceId, param, value, onChange }: ParamProps) {
 	return (
 		<label className="mb-2 flex items-center gap-2 pl-4">
 			<input
-				data-testid={paramBool(effectId, param.name)}
+				data-testid={paramBool(instanceId, param.name)}
 				type="checkbox"
-				checked={value === true || value === 1}
+				checked={Boolean(value)}
 				onChange={(e) => onChange(e.target.checked)}
 			/>
 			{param.label}
@@ -38,21 +41,21 @@ function BoolParam({ effectId, param, value, onChange }: ParamProps) {
 	);
 }
 
-function FloatParam({ effectId, param, value, onChange }: ParamProps) {
+function FloatParam({ instanceId, param, value, onChange }: ParamProps) {
 	if (param.type !== "float") return null;
 	return (
 		<div className="mb-2 pl-4">
 			<div className="mb-1 flex justify-between">
 				<span>{param.label}</span>
 				<span
-					data-testid={paramValue(effectId, param.name)}
+					data-testid={paramValue(instanceId, param.name)}
 					className="tabular-nums text-white/60"
 				>
 					{(value as number).toFixed(2)}
 				</span>
 			</div>
 			<input
-				data-testid={paramSlider(effectId, param.name)}
+				data-testid={paramSlider(instanceId, param.name)}
 				type="range"
 				className="w-full"
 				min={param.min}
@@ -65,21 +68,21 @@ function FloatParam({ effectId, param, value, onChange }: ParamProps) {
 	);
 }
 
-function IntParam({ effectId, param, value, onChange }: ParamProps) {
+function IntParam({ instanceId, param, value, onChange }: ParamProps) {
 	if (param.type !== "int") return null;
 	return (
 		<div className="mb-2 pl-4">
 			<div className="mb-1 flex justify-between">
 				<span>{param.label}</span>
 				<span
-					data-testid={paramValue(effectId, param.name)}
+					data-testid={paramValue(instanceId, param.name)}
 					className="tabular-nums text-white/60"
 				>
 					{value as number}
 				</span>
 			</div>
 			<input
-				data-testid={paramInt(effectId, param.name)}
+				data-testid={paramInt(instanceId, param.name)}
 				type="range"
 				className="w-full"
 				min={param.min}
@@ -92,7 +95,7 @@ function IntParam({ effectId, param, value, onChange }: ParamProps) {
 	);
 }
 
-function EnumParam({ effectId, param, value, onChange }: ParamProps) {
+function EnumParam({ instanceId, param, value, onChange }: ParamProps) {
 	if (param.type !== "enum") return null;
 	return (
 		<div className="mb-2 pl-4">
@@ -100,7 +103,7 @@ function EnumParam({ effectId, param, value, onChange }: ParamProps) {
 				<span>{param.label}</span>
 			</div>
 			<select
-				data-testid={paramEnum(effectId, param.name)}
+				data-testid={paramEnum(instanceId, param.name)}
 				className="w-full rounded bg-white/10 px-2 py-1 text-white"
 				value={value as string}
 				onChange={(e) => onChange(e.target.value)}
@@ -115,7 +118,7 @@ function EnumParam({ effectId, param, value, onChange }: ParamProps) {
 	);
 }
 
-function Vec2Param({ effectId, param, value, onChange }: ParamProps) {
+function Vec2Param({ instanceId, param, value, onChange }: ParamProps) {
 	if (param.type !== "vec2") return null;
 	const v = value as [number, number];
 	return (
@@ -125,7 +128,7 @@ function Vec2Param({ effectId, param, value, onChange }: ParamProps) {
 			</div>
 			<div className="flex gap-2">
 				<input
-					data-testid={`${paramVec2(effectId, param.name)}-x`}
+					data-testid={`${paramVec2(instanceId, param.name)}-x`}
 					type="number"
 					className="w-1/2 rounded bg-white/10 px-2 py-1 text-white"
 					value={v[0]}
@@ -135,7 +138,7 @@ function Vec2Param({ effectId, param, value, onChange }: ParamProps) {
 					onChange={(e) => onChange([Number.parseFloat(e.target.value), v[1]])}
 				/>
 				<input
-					data-testid={`${paramVec2(effectId, param.name)}-y`}
+					data-testid={`${paramVec2(instanceId, param.name)}-y`}
 					type="number"
 					className="w-1/2 rounded bg-white/10 px-2 py-1 text-white"
 					value={v[1]}
@@ -149,7 +152,8 @@ function Vec2Param({ effectId, param, value, onChange }: ParamProps) {
 	);
 }
 
-function ColorParam({ effectId, param, value, onChange }: ParamProps) {
+function ColorParam({ instanceId, param, value, onChange }: ParamProps) {
+	if (param.type !== "color") return null;
 	const c = value as [number, number, number];
 	const labels = ["R", "G", "B"];
 	const suffixes = ["-r", "-g", "-b"];
@@ -163,7 +167,7 @@ function ColorParam({ effectId, param, value, onChange }: ParamProps) {
 					<div key={ch} className="flex-1">
 						<div className="mb-0.5 text-center text-xs text-white/40">{ch}</div>
 						<input
-							data-testid={`${paramColor(effectId, param.name)}${suffixes[i]}`}
+							data-testid={`${paramColor(instanceId, param.name)}${suffixes[i]}`}
 							type="number"
 							className="w-full rounded bg-white/10 px-1 py-1 text-center text-white"
 							value={c[i]}
@@ -185,7 +189,7 @@ function ColorParam({ effectId, param, value, onChange }: ParamProps) {
 
 const PARAM_COMPONENTS: Record<
 	EffectParameterDef["type"],
-	React.ComponentType<ParamProps>
+	ComponentType<ParamProps>
 > = {
 	bool: BoolParam,
 	float: FloatParam,
@@ -197,11 +201,14 @@ const PARAM_COMPONENTS: Record<
 
 export function EffectDevPanel() {
 	const texture = useImageStore((s) => s.texture);
-	const activeEffects = useEffectStore((s) => s.activeEffects);
+	const effectInstances = useEffectStore((s) => s.effects);
 	const addEffect = useEffectStore((s) => s.addEffect);
 	const removeEffect = useEffectStore((s) => s.removeEffect);
-	const parameters = useEffectStore((s) => s.parameters);
+	const removeEffectsByEffectId = useEffectStore(
+		(s) => s.removeEffectsByEffectId,
+	);
 	const setEffectParam = useEffectStore((s) => s.setEffectParam);
+	const duplicateEffect = useEffectStore((s) => s.duplicateEffect);
 
 	const effects = useMemo(
 		() => getAllEffects().filter((e) => e.id !== "passthrough"),
@@ -216,8 +223,10 @@ export function EffectDevPanel() {
 			className="fixed bottom-4 right-4 z-50 w-64 max-h-[80vh] overflow-y-auto rounded-lg bg-black/80 p-4 text-sm text-white backdrop-blur-sm"
 		>
 			{effects.map((def) => {
-				const isActive = activeEffects.includes(def.id);
-				const values = parameters[def.id] ?? {};
+				const instances = effectInstances.filter(
+					(effect) => effect.effectId === def.id,
+				);
+				const isActive = instances.length > 0;
 
 				return (
 					<div
@@ -234,7 +243,7 @@ export function EffectDevPanel() {
 									if (e.target.checked) {
 										addEffect(def.id);
 									} else {
-										removeEffect(def.id);
+										removeEffectsByEffectId(def.id);
 									}
 								}}
 							/>
@@ -242,18 +251,52 @@ export function EffectDevPanel() {
 						</label>
 
 						{isActive &&
-							def.parameters.map((param) => {
-								const Component = PARAM_COMPONENTS[param.type];
-								return (
-									<Component
-										key={param.name}
-										effectId={def.id}
-										param={param}
-										value={values[param.name] ?? param.default}
-										onChange={(v) => setEffectParam(def.id, param.name, v)}
-									/>
-								);
-							})}
+							instances.map((instance, index) => (
+								<div
+									key={instance.instanceId}
+									data-testid={effectInstance(instance.instanceId)}
+									className="mb-3 rounded-md border border-white/10 py-2 pr-2 last:mb-0"
+								>
+									<div className="mb-2 flex items-center justify-between gap-2 pl-4">
+										<span className="text-xs font-medium text-white/50">
+											Instance {index + 1}
+										</span>
+										<div className="flex gap-1">
+											<button
+												data-testid={effectDuplicate(instance.instanceId)}
+												type="button"
+												className="rounded bg-white/10 px-2 py-1 text-xs text-white/70 transition hover:bg-white/20"
+												onClick={() => duplicateEffect(instance.instanceId)}
+											>
+												Duplicate
+											</button>
+											<button
+												data-testid={effectRemove(instance.instanceId)}
+												type="button"
+												className="rounded bg-white/10 px-2 py-1 text-xs text-white/70 transition hover:bg-white/20"
+												onClick={() => removeEffect(instance.instanceId)}
+											>
+												Remove
+											</button>
+										</div>
+									</div>
+
+									{def.parameters.map((param) => {
+										const Component = PARAM_COMPONENTS[param.type];
+										return (
+											<Component
+												key={param.name}
+												instanceId={instance.instanceId}
+												param={param}
+												value={instance.parameters[param.name] ?? param.default}
+												onChange={(v) =>
+													setEffectParam(instance.instanceId, param.name, v)
+												}
+											/>
+										);
+									})}
+								</div>
+							))}
 					</div>
 				);
 			})}

@@ -1,9 +1,7 @@
 import * as THREE from "three";
 
 import { renderEffectChain } from "@/effects/renderEffectChain";
-import type { EffectParameterValue } from "@/effects/types";
-
-type EffectParameters = Record<string, Record<string, EffectParameterValue>>;
+import type { EffectInstance } from "@/effects/types";
 
 interface CreateEffectChainRendererOptions {
 	gl: THREE.WebGLRenderer;
@@ -12,7 +10,7 @@ interface CreateEffectChainRendererOptions {
 
 export interface EffectChainRenderer {
 	setImage: (texture: THREE.Texture | null) => void;
-	setEffects: (activeEffects: string[], parameters: EffectParameters) => void;
+	setEffects: (effects: readonly EffectInstance[]) => void;
 	resize: (width: number, height: number) => void;
 	renderFrame: (time: number) => void;
 	dispose: () => void;
@@ -43,17 +41,26 @@ function createOffScreenScene() {
 	return { scene, camera, mesh, geometry };
 }
 
+function haveEffectInstanceIdsChanged(
+	currentEffects: readonly EffectInstance[],
+	nextEffects: readonly EffectInstance[],
+): boolean {
+	if (currentEffects.length !== nextEffects.length) return true;
+
+	const currentIds = new Set(currentEffects.map((effect) => effect.instanceId));
+	return nextEffects.some((effect) => !currentIds.has(effect.instanceId));
+}
+
 export function createEffectChainRenderer({
 	gl,
 	outputMaterial,
 }: CreateEffectChainRendererOptions): EffectChainRenderer {
 	let texture: THREE.Texture | null = null;
-	let activeEffects: string[] = [];
-	let parameters: EffectParameters = {};
+	let effects: readonly EffectInstance[] = [];
 	let fbos: readonly [THREE.WebGLRenderTarget, THREE.WebGLRenderTarget] | null =
 		null;
-	let width = 1;
-	let height = 1;
+	let width = 0;
+	let height = 0;
 	let disposed = false;
 
 	const offScreen = createOffScreenScene();
@@ -82,12 +89,18 @@ export function createEffectChainRenderer({
 	};
 
 	const disposeInactiveMaterials = () => {
-		const activeSet = new Set(activeEffects);
+		const activeSet = new Set(effects.map((effect) => effect.instanceId));
+		const inactiveIds: string[] = [];
+
 		for (const [id, material] of materialCache) {
 			if (!activeSet.has(id)) {
 				material.dispose();
-				materialCache.delete(id);
+				inactiveIds.push(id);
 			}
+		}
+
+		for (const id of inactiveIds) {
+			materialCache.delete(id);
 		}
 	};
 
@@ -98,12 +111,15 @@ export function createEffectChainRenderer({
 			setOutputTexture(nextTexture);
 		},
 
-		setEffects(nextActiveEffects, nextParameters) {
+		setEffects(nextEffects) {
 			if (disposed) return;
-			const effectsChanged = activeEffects !== nextActiveEffects;
-			activeEffects = nextActiveEffects;
-			parameters = nextParameters;
-			if (effectsChanged) {
+			if (nextEffects === effects) return;
+			const instanceIdsChanged = haveEffectInstanceIdsChanged(
+				effects,
+				nextEffects,
+			);
+			effects = nextEffects;
+			if (instanceIdsChanged) {
 				disposeInactiveMaterials();
 			}
 		},
@@ -123,8 +139,9 @@ export function createEffectChainRenderer({
 
 		renderFrame(time) {
 			if (disposed || !texture) return;
+			if (width === 0 || height === 0) return;
 
-			if (activeEffects.length === 0) {
+			if (effects.length === 0) {
 				setOutputTexture(texture);
 				return;
 			}
@@ -136,8 +153,7 @@ export function createEffectChainRenderer({
 			const outputTexture = renderEffectChain({
 				gl,
 				texture,
-				activeEffects,
-				parameters,
+				effects,
 				fbos,
 				offScreen,
 				materialCache,

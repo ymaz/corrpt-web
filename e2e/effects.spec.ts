@@ -9,7 +9,13 @@ import {
 	paramSlider,
 	paramValue,
 } from "../src/lib/test-ids";
-import { expect, setSliderValue, test, uploadViaLanding } from "./fixtures";
+import {
+	expect,
+	getEffectInstanceIds,
+	setSliderValue,
+	test,
+	uploadViaLanding,
+} from "./fixtures";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const testImage = path.resolve(__dirname, "test-200x100.png");
@@ -38,20 +44,21 @@ test.describe("effects", () => {
 		consoleErrors,
 	}) => {
 		await page.getByTestId(effectToggle("rgbShift")).check();
+		const [instanceId] = await getEffectInstanceIds(page, "rgbShift");
 
 		await expect(
-			page.getByTestId(paramSlider("rgbShift", "intensity")),
+			page.getByTestId(paramSlider(instanceId, "intensity")),
 		).toBeVisible();
 		await expect(
-			page.getByTestId(paramSlider("rgbShift", "angle")),
+			page.getByTestId(paramSlider(instanceId, "angle")),
 		).toBeVisible();
 		await expect(
-			page.getByTestId(paramBool("rgbShift", "animated")),
+			page.getByTestId(paramBool(instanceId, "animated")),
 		).toBeVisible();
 		await expect(
-			page.getByTestId(paramValue("rgbShift", "intensity")),
+			page.getByTestId(paramValue(instanceId, "intensity")),
 		).toHaveText("0.50");
-		await expect(page.getByTestId(paramValue("rgbShift", "angle"))).toHaveText(
+		await expect(page.getByTestId(paramValue(instanceId, "angle"))).toHaveText(
 			"0.00",
 		);
 		expect(consoleErrors).toEqual([]);
@@ -62,10 +69,72 @@ test.describe("effects", () => {
 		consoleErrors,
 	}) => {
 		await page.getByTestId(effectToggle("rgbShift")).check();
-		await setSliderValue(page, paramSlider("rgbShift", "intensity"), 0.8);
+		const [instanceId] = await getEffectInstanceIds(page, "rgbShift");
+		await setSliderValue(page, paramSlider(instanceId, "intensity"), 0.8);
 		await expect(
-			page.getByTestId(paramValue("rgbShift", "intensity")),
+			page.getByTestId(paramValue(instanceId, "intensity")),
 		).toHaveText("0.80");
+		expect(consoleErrors).toEqual([]);
+	});
+
+	test("duplicating an effect creates independent parameter blocks", async ({
+		page,
+		consoleErrors,
+	}) => {
+		await page.getByTestId(effectToggle("rgbShift")).check();
+		const [firstInstanceId] = await getEffectInstanceIds(page, "rgbShift");
+		await setSliderValue(page, paramSlider(firstInstanceId, "intensity"), 0.8);
+		const rgbShiftSection = page.getByTestId(effectSection("rgbShift"));
+		await rgbShiftSection.locator("[data-testid^='effect-duplicate-']").click();
+		await expect(
+			rgbShiftSection.locator("[data-testid^='effect-instance-']"),
+		).toHaveCount(2);
+
+		const [sourceInstanceId, duplicateInstanceId] = await getEffectInstanceIds(
+			page,
+			"rgbShift",
+		);
+		await expect(
+			page.getByTestId(paramValue(sourceInstanceId, "intensity")),
+		).toHaveText("0.80");
+		await expect(
+			page.getByTestId(paramValue(duplicateInstanceId, "intensity")),
+		).toHaveText("0.80");
+
+		await setSliderValue(page, paramSlider(sourceInstanceId, "intensity"), 0.2);
+
+		await expect(
+			page.getByTestId(paramValue(sourceInstanceId, "intensity")),
+		).toHaveText("0.20");
+		await expect(
+			page.getByTestId(paramValue(duplicateInstanceId, "intensity")),
+		).toHaveText("0.80");
+		expect(consoleErrors).toEqual([]);
+	});
+
+	test("removing one duplicate leaves the other instance active", async ({
+		page,
+		consoleErrors,
+	}) => {
+		await page.getByTestId(effectToggle("rgbShift")).check();
+		const rgbShiftSection = page.getByTestId(effectSection("rgbShift"));
+		await rgbShiftSection.locator("[data-testid^='effect-duplicate-']").click();
+		await expect(
+			rgbShiftSection.locator("[data-testid^='effect-instance-']"),
+		).toHaveCount(2);
+		await rgbShiftSection
+			.locator("[data-testid^='effect-remove-']")
+			.first()
+			.click();
+		await expect(
+			rgbShiftSection.locator("[data-testid^='effect-instance-']"),
+		).toHaveCount(1);
+		const [instanceId] = await getEffectInstanceIds(page, "rgbShift");
+
+		await expect(page.getByTestId(effectToggle("rgbShift"))).toBeChecked();
+		await expect(
+			page.getByTestId(paramSlider(instanceId, "intensity")),
+		).toBeVisible();
 		expect(consoleErrors).toEqual([]);
 	});
 
@@ -74,21 +143,22 @@ test.describe("effects", () => {
 		consoleErrors,
 	}) => {
 		await page.getByTestId(effectToggle("pixelSort")).check();
+		const [instanceId] = await getEffectInstanceIds(page, "pixelSort");
 
 		await expect(
-			page.getByTestId(paramSlider("pixelSort", "threshold")),
+			page.getByTestId(paramSlider(instanceId, "threshold")),
 		).toBeVisible();
 		await expect(
-			page.getByTestId(paramSlider("pixelSort", "upperThreshold")),
+			page.getByTestId(paramSlider(instanceId, "upperThreshold")),
 		).toBeVisible();
 		await expect(
-			page.getByTestId(paramSlider("pixelSort", "spread")),
+			page.getByTestId(paramSlider(instanceId, "spread")),
 		).toBeVisible();
 		await expect(
-			page.getByTestId(paramSlider("pixelSort", "direction")),
+			page.getByTestId(paramSlider(instanceId, "direction")),
 		).toBeVisible();
 		await expect(
-			page.getByTestId(paramValue("pixelSort", "threshold")),
+			page.getByTestId(paramValue(instanceId, "threshold")),
 		).toHaveText("0.25");
 		expect(consoleErrors).toEqual([]);
 	});
@@ -99,12 +169,14 @@ test.describe("effects", () => {
 	}) => {
 		await page.getByTestId(effectToggle("rgbShift")).check();
 		await page.getByTestId(effectToggle("pixelSort")).check();
+		const [rgbShiftInstanceId] = await getEffectInstanceIds(page, "rgbShift");
+		const [pixelSortInstanceId] = await getEffectInstanceIds(page, "pixelSort");
 
 		await expect(
-			page.getByTestId(paramSlider("rgbShift", "intensity")),
+			page.getByTestId(paramSlider(rgbShiftInstanceId, "intensity")),
 		).toBeVisible();
 		await expect(
-			page.getByTestId(paramSlider("pixelSort", "threshold")),
+			page.getByTestId(paramSlider(pixelSortInstanceId, "threshold")),
 		).toBeVisible();
 		// Let multi-pass FBO chain render a few frames so any shader/WebGL error
 		// has time to surface before we assert no console errors.
@@ -117,10 +189,11 @@ test.describe("effects", () => {
 		consoleErrors,
 	}) => {
 		await page.getByTestId(effectToggle("pixelSort")).check();
-		await setSliderValue(page, paramSlider("pixelSort", "spread"), 150);
-		await expect(
-			page.getByTestId(paramValue("pixelSort", "spread")),
-		).toHaveText("150.00");
+		const [instanceId] = await getEffectInstanceIds(page, "pixelSort");
+		await setSliderValue(page, paramSlider(instanceId, "spread"), 150);
+		await expect(page.getByTestId(paramValue(instanceId, "spread"))).toHaveText(
+			"150.00",
+		);
 		expect(consoleErrors).toEqual([]);
 	});
 
@@ -130,13 +203,15 @@ test.describe("effects", () => {
 	}) => {
 		await page.getByTestId(effectToggle("rgbShift")).check();
 		await page.getByTestId(effectToggle("pixelSort")).check();
+		const [rgbShiftInstanceId] = await getEffectInstanceIds(page, "rgbShift");
+		const [pixelSortInstanceId] = await getEffectInstanceIds(page, "pixelSort");
 		await page.getByTestId(effectToggle("rgbShift")).uncheck();
 
 		await expect(
-			page.getByTestId(paramSlider("rgbShift", "intensity")),
+			page.getByTestId(paramSlider(rgbShiftInstanceId, "intensity")),
 		).toHaveCount(0);
 		await expect(
-			page.getByTestId(paramSlider("pixelSort", "threshold")),
+			page.getByTestId(paramSlider(pixelSortInstanceId, "threshold")),
 		).toBeVisible();
 		expect(consoleErrors).toEqual([]);
 	});

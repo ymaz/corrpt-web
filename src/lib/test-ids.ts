@@ -12,16 +12,23 @@ export const IMAGE_ERROR = "image-error";
 export const EFFECT_DEV_PANEL = "effect-dev-panel";
 export const effectSection = (id: string) => `effect-section-${id}`;
 export const effectToggle = (id: string) => `effect-toggle-${id}`;
-export const paramSlider = (id: string, name: string) =>
-	`param-slider-${id}-${name}`;
-export const paramValue = (id: string, name: string) =>
-	`param-value-${id}-${name}`;
-export const paramBool = (id: string, name: string) =>
-	`param-bool-${id}-${name}`;
-export const paramInt = (id: string, name: string) => `param-int-${id}-${name}`;
-export const paramEnum = (id: string, name: string) =>
-	`param-enum-${id}-${name}`;
-export const paramVec2 = (id: string, name: string) =>
-	`param-vec2-${id}-${name}`;
-export const paramColor = (id: string, name: string) =>
-	`param-color-${id}-${name}`;
+export const effectInstance = (instanceId: string) =>
+	`effect-instance-${instanceId}`;
+export const effectDuplicate = (instanceId: string) =>
+	`effect-duplicate-${instanceId}`;
+export const effectRemove = (instanceId: string) =>
+	`effect-remove-${instanceId}`;
+export const paramSlider = (instanceId: string, name: string) =>
+	`param-slider-${instanceId}-${name}`;
+export const paramValue = (instanceId: string, name: string) =>
+	`param-value-${instanceId}-${name}`;
+export const paramBool = (instanceId: string, name: string) =>
+	`param-bool-${instanceId}-${name}`;
+export const paramInt = (instanceId: string, name: string) =>
+	`param-int-${instanceId}-${name}`;
+export const paramEnum = (instanceId: string, name: string) =>
+	`param-enum-${instanceId}-${name}`;
+export const paramVec2 = (instanceId: string, name: string) =>
+	`param-vec2-${instanceId}-${name}`;
+export const paramColor = (instanceId: string, name: string) =>
+	`param-color-${instanceId}-${name}`;

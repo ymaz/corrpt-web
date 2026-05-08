@@ -16,6 +16,7 @@ import { useImageStore } from "@/store/imageStore";
 export function ImageActions() {
 	const inputRef = useRef<HTMLInputElement>(null);
 	const [isExporting, setIsExporting] = useState(false);
+	const [exportError, setExportError] = useState<string | null>(null);
 
 	const {
 		texture,
@@ -37,12 +38,7 @@ export function ImageActions() {
 		})),
 	);
 
-	const { activeEffects, parameters } = useEffectStore(
-		useShallow((s) => ({
-			activeEffects: s.activeEffects,
-			parameters: s.parameters,
-		})),
-	);
+	const effects = useEffectStore((s) => s.effects);
 
 	const handleClick = useCallback(() => {
 		inputRef.current?.click();
@@ -64,23 +60,26 @@ export function ImageActions() {
 	const handleDownload = useCallback(() => {
 		if (!texture || !dimensions || !fileName || !mimeType) return;
 
+		setExportError(null);
 		setIsExporting(true);
 		// Use setTimeout to allow the UI to update before blocking export
-		setTimeout(() => {
+		setTimeout(async () => {
 			try {
-				exportImage({
+				await exportImage({
 					texture,
 					dimensions,
-					activeEffects,
-					parameters,
+					effects,
 					mimeType,
 					fileName,
 				});
+			} catch (error) {
+				console.error("Failed to export image", error);
+				setExportError("Failed to export image. Try again.");
 			} finally {
 				setIsExporting(false);
 			}
 		}, 0);
-	}, [texture, dimensions, fileName, mimeType, activeEffects, parameters]);
+	}, [texture, dimensions, fileName, mimeType, effects]);
 
 	if (!texture) return null;
 
@@ -117,9 +116,9 @@ export function ImageActions() {
 				</button>
 			</div>
 
-			{error && (
+			{(error || exportError) && (
 				<p data-testid={IMAGE_ERROR} className="text-sm text-red-400">
-					{error}
+					{[error, exportError].filter(Boolean).join(" ")}
 				</p>
 			)}
 

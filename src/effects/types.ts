@@ -58,6 +58,15 @@ export type EffectParameterValue =
 	| [number, number]
 	| [number, number, number];
 
+export type EffectParameterValues = Record<string, EffectParameterValue>;
+
+export interface EffectInstance {
+	instanceId: string;
+	effectId: string;
+	enabled: boolean;
+	parameters: EffectParameterValues;
+}
+
 export interface EffectDefinition {
 	id: string;
 	name: string;
@@ -67,5 +76,3 @@ export interface EffectDefinition {
 	vertexShader: string;
 	fragmentShader: string;
 }
-
-export type EffectParameterValues = Record<string, EffectParameterValue>;

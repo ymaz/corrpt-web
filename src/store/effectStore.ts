@@ -1,56 +1,123 @@
 import { create } from "zustand";
 
 import { getEffect } from "@/effects/registry";
-import type { EffectParameterValue } from "@/effects/types";
+import type {
+	EffectInstance,
+	EffectParameterValue,
+	EffectParameterValues,
+} from "@/effects/types";
 import type { EffectStore } from "@/store/types";
 
+function createInstanceId(effectId: string): string {
+	return `${effectId}-${crypto.randomUUID()}`;
+}
+
+function createDefaultParameters(effectId: string): EffectParameterValues {
+	const def = getEffect(effectId);
+	const defaults: EffectParameterValues = {};
+	if (!def) return defaults;
+
+	for (const p of def.parameters) {
+		defaults[p.name] = structuredClone(p.default);
+	}
+
+	return defaults;
+}
+
+function createEffectInstance(effectId: string): EffectInstance {
+	return {
+		instanceId: createInstanceId(effectId),
+		effectId,
+		enabled: true,
+		parameters: createDefaultParameters(effectId),
+	};
+}
+
 export const useEffectStore = create<EffectStore>((set, get) => ({
-	activeEffects: [],
-	parameters: {},
+	effects: [],
 	previewMode: "full",
 
-	addEffect: (id: string) => {
-		const { activeEffects } = get();
-		if (activeEffects.includes(id)) return;
-		const def = getEffect(id);
-		const defaults: Record<string, EffectParameterValue> = {};
-		if (def) {
-			for (const p of def.parameters) {
-				defaults[p.name] = p.default;
-			}
-		}
+	addEffect: (effectId: string) => {
 		set({
-			activeEffects: [...activeEffects, id],
-			parameters: { ...get().parameters, [id]: defaults },
+			effects: [...get().effects, createEffectInstance(effectId)],
 		});
 	},
 
-	removeEffect: (id: string) => {
-		const { activeEffects, parameters } = get();
-		const { [id]: _, ...rest } = parameters;
+	removeEffect: (instanceId: string) => {
+		const { effects } = get();
 		set({
-			activeEffects: activeEffects.filter((e) => e !== id),
-			parameters: rest,
+			effects: effects.filter((effect) => effect.instanceId !== instanceId),
+		});
+	},
+
+	removeEffectsByEffectId: (effectId: string) => {
+		const { effects } = get();
+		set({
+			effects: effects.filter((effect) => effect.effectId !== effectId),
 		});
 	},
 
 	setEffectParam: (
-		effectId: string,
+		instanceId: string,
 		paramName: string,
 		value: EffectParameterValue,
 	) => {
-		const { parameters } = get();
-		if (!parameters[effectId]) return;
+		const { effects } = get();
+		if (!effects.some((effect) => effect.instanceId === instanceId)) return;
+
 		set({
-			parameters: {
-				...parameters,
-				[effectId]: { ...parameters[effectId], [paramName]: value },
-			},
+			effects: effects.map((effect) =>
+				effect.instanceId === instanceId
+					? {
+							...effect,
+							parameters: {
+								...effect.parameters,
+								[paramName]: structuredClone(value),
+							},
+						}
+					: effect,
+			),
 		});
 	},
 
-	reorderEffects: (effectIds: string[]) => {
-		set({ activeEffects: effectIds });
+	reorderEffects: (instanceIds: string[]) => {
+		const { effects } = get();
+		if (instanceIds.length !== effects.length) return;
+
+		const effectsById = new Map(
+			effects.map((effect) => [effect.instanceId, effect]),
+		);
+		const nextEffects: EffectInstance[] = [];
+		const seenInstanceIds = new Set<string>();
+
+		for (const instanceId of instanceIds) {
+			if (seenInstanceIds.has(instanceId)) return;
+			const effect = effectsById.get(instanceId);
+			if (!effect) return;
+			seenInstanceIds.add(instanceId);
+			nextEffects.push(effect);
+		}
+
+		set({ effects: nextEffects });
+	},
+
+	duplicateEffect: (instanceId: string) => {
+		const { effects } = get();
+		const sourceIndex = effects.findIndex(
+			(effect) => effect.instanceId === instanceId,
+		);
+		if (sourceIndex === -1) return;
+
+		const source = effects[sourceIndex];
+		const duplicate: EffectInstance = {
+			...source,
+			instanceId: createInstanceId(source.effectId),
+			parameters: structuredClone(source.parameters),
+		};
+		const nextEffects = [...effects];
+		nextEffects.splice(sourceIndex + 1, 0, duplicate);
+
+		set({ effects: nextEffects });
 	},
 
 	setPreviewMode: (mode) => {

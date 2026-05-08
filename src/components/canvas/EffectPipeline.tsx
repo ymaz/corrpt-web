@@ -57,7 +57,7 @@ export function EffectPipeline({ texture }: EffectPipelineProps) {
 				imageState.dimensions.height,
 			);
 		}
-		renderer.setEffects(effectState.activeEffects, effectState.parameters);
+		renderer.setEffects(effectState.effects);
 
 		return () => {
 			renderer.dispose();
@@ -86,8 +86,8 @@ export function EffectPipeline({ texture }: EffectPipelineProps) {
 		const renderer = rendererRef.current;
 		if (!renderer) return;
 
-		const { activeEffects, parameters } = useEffectStore.getState();
-		renderer.setEffects(activeEffects, parameters);
+		const { effects } = useEffectStore.getState();
+		renderer.setEffects(effects);
 		renderer.renderFrame(timeRef.current);
 	});
 

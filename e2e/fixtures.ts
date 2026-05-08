@@ -1,6 +1,10 @@
 import { test as base, expect, type Page } from "@playwright/test";
 
-import { LANDING_FILE_INPUT, REPLACE_FILE_INPUT } from "../src/lib/test-ids";
+import {
+	effectSection,
+	LANDING_FILE_INPUT,
+	REPLACE_FILE_INPUT,
+} from "../src/lib/test-ids";
 
 type Fixtures = {
 	consoleErrors: string[];
@@ -35,6 +39,29 @@ export async function uploadViaReplace(
 	await page
 		.locator(`[data-testid="${REPLACE_FILE_INPUT}"]`)
 		.setInputFiles(file);
+}
+
+export async function getEffectInstanceIds(
+	page: Page,
+	effectId: string,
+): Promise<string[]> {
+	const prefix = "effect-instance-";
+	const container = page.getByTestId(effectSection(effectId));
+	const instances = container.locator(`[data-testid^="${prefix}"]`);
+	if ((await instances.count()) === 0) {
+		throw new Error(`No instances found for effect: ${effectId}`);
+	}
+	return instances.evaluateAll(
+		(elements, prefix) =>
+			elements.map((element) => {
+				const testId = element.getAttribute("data-testid");
+				if (!testId?.startsWith(prefix)) {
+					throw new Error(`Effect instance test id not found: ${testId}`);
+				}
+				return testId.slice(prefix.length);
+			}),
+		prefix,
+	);
 }
 
 /**

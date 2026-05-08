@@ -1,6 +1,6 @@
 import type * as THREE from "three";
 
-import type { EffectParameterValue } from "@/effects/types";
+import type { EffectInstance, EffectParameterValue } from "@/effects/types";
 
 // Shared type aliases
 export type PreviewMode = "split" | "full" | "compare";
@@ -32,20 +32,21 @@ export type ImageStore = ImageState & ImageActions;
 
 // Effect store
 export interface EffectState {
-	activeEffects: string[];
-	parameters: Record<string, Record<string, EffectParameterValue>>;
+	effects: EffectInstance[];
 	previewMode: PreviewMode;
 }
 
 export interface EffectActions {
-	addEffect: (id: string) => void;
-	removeEffect: (id: string) => void;
+	addEffect: (effectId: string) => void;
+	removeEffect: (instanceId: string) => void;
+	removeEffectsByEffectId: (effectId: string) => void;
 	setEffectParam: (
-		effectId: string,
+		instanceId: string,
 		paramName: string,
 		value: EffectParameterValue,
 	) => void;
-	reorderEffects: (effectIds: string[]) => void;
+	reorderEffects: (instanceIds: string[]) => void;
+	duplicateEffect: (instanceId: string) => void;
 	setPreviewMode: (mode: PreviewMode) => void;
 }
 
