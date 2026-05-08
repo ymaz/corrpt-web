@@ -1,3 +1,4 @@
+import { Copy, Trash2 } from "lucide-react";
 import { type ComponentType, useMemo } from "react";
 
 import { getAllEffects } from "@/effects/registry";
@@ -17,7 +18,7 @@ import {
 	paramValue,
 	paramVec2,
 } from "@/lib/test-ids";
-import { useEffectStore } from "@/store/effectStore";
+import { MAX_EFFECT_INSTANCES, useEffectStore } from "@/store/effectStore";
 import { useImageStore } from "@/store/imageStore";
 
 interface ParamProps {
@@ -227,6 +228,7 @@ export function EffectDevPanel() {
 					(effect) => effect.effectId === def.id,
 				);
 				const isActive = instances.length > 0;
+				const atLimit = instances.length >= MAX_EFFECT_INSTANCES;
 
 				return (
 					<div
@@ -265,18 +267,21 @@ export function EffectDevPanel() {
 											<button
 												data-testid={effectDuplicate(instance.instanceId)}
 												type="button"
-												className="rounded bg-white/10 px-2 py-1 text-xs text-white/70 transition hover:bg-white/20"
+												className="rounded bg-white/10 p-1.5 text-white/70 transition hover:bg-white/20 disabled:cursor-help disabled:opacity-40"
+												disabled={atLimit}
+												title={atLimit ? `Max ${MAX_EFFECT_INSTANCES} instances per effect` : "Duplicate"}
 												onClick={() => duplicateEffect(instance.instanceId)}
 											>
-												Duplicate
+												<Copy size={12} />
 											</button>
 											<button
 												data-testid={effectRemove(instance.instanceId)}
 												type="button"
-												className="rounded bg-white/10 px-2 py-1 text-xs text-white/70 transition hover:bg-white/20"
+												className="rounded bg-white/10 p-1.5 text-white/70 transition hover:bg-red-500/40"
+												title="Remove instance"
 												onClick={() => removeEffect(instance.instanceId)}
 											>
-												Remove
+												<Trash2 size={12} />
 											</button>
 										</div>
 									</div>

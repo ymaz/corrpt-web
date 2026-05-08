@@ -33,15 +33,17 @@ function createEffectInstance(effectId: string): EffectInstance {
 	};
 }
 
+export const MAX_EFFECT_INSTANCES = 3;
+
 export const useEffectStore = create<EffectStore>((set, get) => ({
 	effects: [],
 	previewMode: "full",
 	time: 0,
 
 	addEffect: (effectId: string) => {
-		set({
-			effects: [...get().effects, createEffectInstance(effectId)],
-		});
+		const { effects } = get();
+		if (effects.filter((e) => e.effectId === effectId).length >= MAX_EFFECT_INSTANCES) return;
+		set({ effects: [...effects, createEffectInstance(effectId)] });
 	},
 
 	removeEffect: (instanceId: string) => {
@@ -110,6 +112,7 @@ export const useEffectStore = create<EffectStore>((set, get) => ({
 		if (sourceIndex === -1) return;
 
 		const source = effects[sourceIndex];
+		if (effects.filter((e) => e.effectId === source.effectId).length >= MAX_EFFECT_INSTANCES) return;
 		const duplicate: EffectInstance = {
 			...source,
 			instanceId: createInstanceId(source.effectId),
