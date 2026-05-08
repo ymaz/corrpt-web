@@ -7,7 +7,7 @@ import {
 	createEffectChainRenderer,
 	type EffectChainRenderer,
 } from "@/engine/createEffectChainRenderer";
-import { useEffectStore } from "@/store/effectStore";
+import { getTime, setTime, useEffectStore } from "@/store/effectStore";
 import { useImageStore } from "@/store/imageStore";
 
 interface EffectPipelineProps {
@@ -108,8 +108,8 @@ export function EffectPipeline({ texture }: EffectPipelineProps) {
 
 	useFrame((_state, delta) => {
 		const store = useEffectStore.getState();
-		const time = store.time + delta;
-		store.setTime(time);
+		const time = getTime() + delta;
+		setTime(time);
 
 		const renderer = rendererRef.current;
 		if (!renderer) return;

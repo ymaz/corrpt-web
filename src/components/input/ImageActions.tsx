@@ -11,7 +11,7 @@ import {
 	REPLACE_FILE_INPUT,
 	REPLACE_IMAGE_BUTTON,
 } from "@/lib/test-ids";
-import { useEffectStore } from "@/store/effectStore";
+import { getTime, useEffectStore } from "@/store/effectStore";
 import { useImageStore } from "@/store/imageStore";
 
 export function ImageActions() {
@@ -65,7 +65,7 @@ export function ImageActions() {
 
 		setExportError(null);
 		setIsExporting(true);
-		const time = useEffectStore.getState().time;
+		const time = getTime();
 		// Use setTimeout to allow the UI to update before blocking export
 		setTimeout(async () => {
 			try {

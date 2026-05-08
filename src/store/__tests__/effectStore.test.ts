@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { registerEffect } from "@/effects/registry";
 import type { EffectDefinition } from "@/effects/types";
-import { useEffectStore } from "../effectStore";
+import { getTime, setTime, useEffectStore } from "../effectStore";
 
 const TEST_EFFECT_ID = "store-test-effect";
 
@@ -30,7 +30,8 @@ registerEffect(testDef);
 
 describe("effectStore", () => {
 	beforeEach(() => {
-		useEffectStore.setState({ effects: [], previewMode: "full", time: 0 });
+		setTime(0);
+		useEffectStore.setState({ effects: [], previewMode: "full" });
 	});
 
 	it("starts with no effects after reset", () => {
@@ -131,9 +132,23 @@ describe("effectStore", () => {
 		expect(useEffectStore.getState().previewMode).toBe("split");
 	});
 
-	it("setTime updates time", () => {
-		useEffectStore.getState().setTime(1.5);
-		expect(useEffectStore.getState().time).toBe(1.5);
+	it("getTime returns 0 on reset", () => {
+		expect(getTime()).toBe(0);
+	});
+
+	it("setTime / getTime round-trip outside Zustand", () => {
+		setTime(1.5);
+		expect(getTime()).toBe(1.5);
+	});
+
+	it("setTime does not notify Zustand subscribers", () => {
+		let notifications = 0;
+		const unsub = useEffectStore.subscribe(() => {
+			notifications++;
+		});
+		setTime(2.0);
+		unsub();
+		expect(notifications).toBe(0);
 	});
 
 	it("duplicateEffect copies current parameter values into the new instance", () => {

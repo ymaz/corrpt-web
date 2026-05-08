@@ -35,8 +35,6 @@ export type ImageStore = ImageState & ImageActions;
 export interface EffectState {
 	effects: EffectInstance[];
 	previewMode: PreviewMode;
-	// Updated every frame by EffectPipeline — read via getState() only, never subscribe
-	time: number;
 }
 
 export interface EffectActions {
@@ -51,7 +49,6 @@ export interface EffectActions {
 	reorderEffects: (instanceIds: string[]) => void;
 	duplicateEffect: (instanceId: string) => void;
 	setPreviewMode: (mode: PreviewMode) => void;
-	setTime: (time: number) => void;
 }
 
 export type EffectStore = EffectState & EffectActions;

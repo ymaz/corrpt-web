@@ -1,8 +1,13 @@
 import { Copy, Trash2 } from "lucide-react";
-import { type ComponentType, useMemo } from "react";
+import { type ComponentType, memo, useCallback, useMemo } from "react";
+import { useShallow } from "zustand/react/shallow";
 
 import { getAllEffects } from "@/effects/registry";
-import type { EffectParameterDef, EffectParameterValue } from "@/effects/types";
+import type {
+	EffectDefinition,
+	EffectParameterDef,
+	EffectParameterValue,
+} from "@/effects/types";
 import {
 	EFFECT_DEV_PANEL,
 	effectDuplicate,
@@ -200,16 +205,122 @@ const PARAM_COMPONENTS: Record<
 	color: ColorParam,
 };
 
+// Stable onChange per param — memo short-circuits when value doesn't change.
+const ParamRow = memo(function ParamRow({
+	instanceId,
+	param,
+	value,
+	setEffectParam,
+}: {
+	instanceId: string;
+	param: EffectParameterDef;
+	value: EffectParameterValue;
+	setEffectParam: (
+		instanceId: string,
+		paramName: string,
+		value: EffectParameterValue,
+	) => void;
+}) {
+	const onChange = useCallback(
+		(v: EffectParameterValue) => setEffectParam(instanceId, param.name, v),
+		[instanceId, param.name, setEffectParam],
+	);
+	const Component = PARAM_COMPONENTS[param.type];
+	return (
+		<Component
+			instanceId={instanceId}
+			param={param}
+			value={value}
+			onChange={onChange}
+		/>
+	);
+});
+
+// Subscribes only to its own instance — re-renders when its params change,
+// not when sibling instances change. memo prevents cascading re-renders when
+// the parent re-renders due to add/remove/reorder.
+const EffectInstanceBlock = memo(function EffectInstanceBlock({
+	instanceId,
+	def,
+	index,
+	atLimit,
+}: {
+	instanceId: string;
+	def: EffectDefinition;
+	index: number;
+	atLimit: boolean;
+}) {
+	const instance = useEffectStore((s) =>
+		s.effects.find((e) => e.instanceId === instanceId),
+	);
+	const setEffectParam = useEffectStore((s) => s.setEffectParam);
+	const removeEffect = useEffectStore((s) => s.removeEffect);
+	const duplicateEffect = useEffectStore((s) => s.duplicateEffect);
+
+	if (!instance) return null;
+
+	return (
+		<div
+			data-testid={effectInstance(instanceId)}
+			className="mb-3 rounded-md border border-white/10 py-2 pr-2 last:mb-0"
+		>
+			<div className="mb-2 flex items-center justify-between gap-2 pl-4">
+				<span className="text-xs font-medium text-white/50">
+					Instance {index + 1}
+				</span>
+				<div className="flex gap-1">
+					<button
+						data-testid={effectDuplicate(instanceId)}
+						type="button"
+						className="rounded bg-white/10 p-1.5 text-white/70 transition hover:bg-white/20 disabled:cursor-help disabled:opacity-40"
+						disabled={atLimit}
+						title={
+							atLimit
+								? `Max ${MAX_EFFECT_INSTANCES} instances per effect`
+								: "Duplicate"
+						}
+						onClick={() => duplicateEffect(instanceId)}
+					>
+						<Copy size={12} />
+					</button>
+					<button
+						data-testid={effectRemove(instanceId)}
+						type="button"
+						className="rounded bg-white/10 p-1.5 text-white/70 transition hover:bg-red-500/40"
+						title="Remove instance"
+						onClick={() => removeEffect(instanceId)}
+					>
+						<Trash2 size={12} />
+					</button>
+				</div>
+			</div>
+
+			{def.parameters.map((param) => (
+				<ParamRow
+					key={param.name}
+					instanceId={instanceId}
+					param={param}
+					value={instance.parameters[param.name] ?? param.default}
+					setEffectParam={setEffectParam}
+				/>
+			))}
+		</div>
+	);
+});
+
 export function EffectDevPanel() {
 	const texture = useImageStore((s) => s.texture);
-	const effectInstances = useEffectStore((s) => s.effects);
+
+	// Structural selector — re-renders only on add/remove/reorder, not param changes.
+	// String entries ("instanceId|effectId") compare by value via Object.is; object
+	// literals would always fail shallow equality even with identical content.
+	const effectKeys = useEffectStore(
+		useShallow((s) => s.effects.map((e) => `${e.instanceId}|${e.effectId}`)),
+	);
 	const addEffect = useEffectStore((s) => s.addEffect);
-	const removeEffect = useEffectStore((s) => s.removeEffect);
 	const removeEffectsByEffectId = useEffectStore(
 		(s) => s.removeEffectsByEffectId,
 	);
-	const setEffectParam = useEffectStore((s) => s.setEffectParam);
-	const duplicateEffect = useEffectStore((s) => s.duplicateEffect);
 
 	const effects = useMemo(
 		() => getAllEffects().filter((e) => e.id !== "passthrough"),
@@ -224,11 +335,9 @@ export function EffectDevPanel() {
 			className="fixed bottom-4 right-4 z-50 w-64 max-h-[80vh] overflow-y-auto rounded-lg bg-black/80 p-4 text-sm text-white backdrop-blur-sm"
 		>
 			{effects.map((def) => {
-				const instances = effectInstances.filter(
-					(effect) => effect.effectId === def.id,
-				);
-				const isActive = instances.length > 0;
-				const atLimit = instances.length >= MAX_EFFECT_INSTANCES;
+				const keysForDef = effectKeys.filter((k) => k.endsWith(`|${def.id}`));
+				const isActive = keysForDef.length > 0;
+				const atLimit = keysForDef.length >= MAX_EFFECT_INSTANCES;
 
 				return (
 					<div
@@ -253,55 +362,18 @@ export function EffectDevPanel() {
 						</label>
 
 						{isActive &&
-							instances.map((instance, index) => (
-								<div
-									key={instance.instanceId}
-									data-testid={effectInstance(instance.instanceId)}
-									className="mb-3 rounded-md border border-white/10 py-2 pr-2 last:mb-0"
-								>
-									<div className="mb-2 flex items-center justify-between gap-2 pl-4">
-										<span className="text-xs font-medium text-white/50">
-											Instance {index + 1}
-										</span>
-										<div className="flex gap-1">
-											<button
-												data-testid={effectDuplicate(instance.instanceId)}
-												type="button"
-												className="rounded bg-white/10 p-1.5 text-white/70 transition hover:bg-white/20 disabled:cursor-help disabled:opacity-40"
-												disabled={atLimit}
-												title={atLimit ? `Max ${MAX_EFFECT_INSTANCES} instances per effect` : "Duplicate"}
-												onClick={() => duplicateEffect(instance.instanceId)}
-											>
-												<Copy size={12} />
-											</button>
-											<button
-												data-testid={effectRemove(instance.instanceId)}
-												type="button"
-												className="rounded bg-white/10 p-1.5 text-white/70 transition hover:bg-red-500/40"
-												title="Remove instance"
-												onClick={() => removeEffect(instance.instanceId)}
-											>
-												<Trash2 size={12} />
-											</button>
-										</div>
-									</div>
-
-									{def.parameters.map((param) => {
-										const Component = PARAM_COMPONENTS[param.type];
-										return (
-											<Component
-												key={param.name}
-												instanceId={instance.instanceId}
-												param={param}
-												value={instance.parameters[param.name] ?? param.default}
-												onChange={(v) =>
-													setEffectParam(instance.instanceId, param.name, v)
-												}
-											/>
-										);
-									})}
-								</div>
-							))}
+							keysForDef.map((key, index) => {
+								const instanceId = key.slice(0, key.lastIndexOf("|"));
+								return (
+									<EffectInstanceBlock
+										key={instanceId}
+										instanceId={instanceId}
+										def={def}
+										index={index}
+										atLimit={atLimit}
+									/>
+								);
+							})}
 					</div>
 				);
 			})}
