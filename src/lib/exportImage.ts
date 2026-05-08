@@ -12,6 +12,7 @@ export interface ExportOptions {
 	effects: readonly EffectInstance[];
 	mimeType: string;
 	fileName: string;
+	time: number;
 }
 
 const MIME_TO_EXT: Record<string, string> = {
@@ -25,7 +26,7 @@ const MIME_TO_EXT: Record<string, string> = {
  * Creates off-screen renderer, processes effects, and triggers download.
  */
 export function exportImage(options: ExportOptions): Promise<void> {
-	const { texture, dimensions, effects, mimeType, fileName } = options;
+	const { texture, dimensions, effects, mimeType, fileName, time } = options;
 	const { width, height } = dimensions;
 
 	// Create off-screen canvas and renderer
@@ -72,7 +73,7 @@ export function exportImage(options: ExportOptions): Promise<void> {
 		offScreen: { scene, camera, mesh },
 		materialCache,
 		resolution: new THREE.Vector2(width, height),
-		time: 0,
+		time,
 	});
 
 	// Create display material to render final texture to canvas

@@ -44,4 +44,4 @@ npm run test:e2e # playwright test
 
 ## Status
 
-Stages 1–3 complete. Stage 4 (UI polish) in progress. Stage 5 (export) partially done — `src/lib/exportImage.ts` has known bugs: async/sync mismatch, `time: 0` hardcoded, no user-facing error feedback.
+Stages 1–3 complete. Stage 4 (UI polish) in progress. Stage 5 (export) partially done.

@@ -62,6 +62,7 @@ export function ImageActions() {
 
 		setExportError(null);
 		setIsExporting(true);
+		const time = performance.now() / 1000;
 		// Use setTimeout to allow the UI to update before blocking export
 		setTimeout(async () => {
 			try {
@@ -71,6 +72,7 @@ export function ImageActions() {
 					effects,
 					mimeType,
 					fileName,
+					time,
 				});
 			} catch (error) {
 				console.error("Failed to export image", error);
