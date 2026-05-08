@@ -62,7 +62,7 @@ export function ImageActions() {
 
 		setExportError(null);
 		setIsExporting(true);
-		const time = performance.now() / 1000;
+		const time = useEffectStore.getState().time;
 		// Use setTimeout to allow the UI to update before blocking export
 		setTimeout(async () => {
 			try {

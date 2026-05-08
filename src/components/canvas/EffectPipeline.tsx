@@ -17,7 +17,6 @@ interface EffectPipelineProps {
 export function EffectPipeline({ texture }: EffectPipelineProps) {
 	const materialRef = useRef<THREE.ShaderMaterial>(null);
 	const rendererRef = useRef<EffectChainRenderer | null>(null);
-	const timeRef = useRef(0);
 	const { viewport, gl } = useThree();
 
 	// dimensions is always set in the same set() call as texture, and this
@@ -82,13 +81,15 @@ export function EffectPipeline({ texture }: EffectPipelineProps) {
 	}, [imageHeight, imageWidth]);
 
 	useFrame((_state, delta) => {
-		timeRef.current += delta;
+		const store = useEffectStore.getState();
+		const time = store.time + delta;
+		store.setTime(time);
+
 		const renderer = rendererRef.current;
 		if (!renderer) return;
 
-		const { effects } = useEffectStore.getState();
-		renderer.setEffects(effects);
-		renderer.renderFrame(timeRef.current);
+		renderer.setEffects(store.effects);
+		renderer.renderFrame(time);
 	});
 
 	return (

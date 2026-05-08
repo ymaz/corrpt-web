@@ -36,6 +36,7 @@ function createEffectInstance(effectId: string): EffectInstance {
 export const useEffectStore = create<EffectStore>((set, get) => ({
 	effects: [],
 	previewMode: "full",
+	time: 0,
 
 	addEffect: (effectId: string) => {
 		set({
@@ -122,5 +123,9 @@ export const useEffectStore = create<EffectStore>((set, get) => ({
 
 	setPreviewMode: (mode) => {
 		set({ previewMode: mode });
+	},
+
+	setTime: (time) => {
+		set({ time });
 	},
 }));

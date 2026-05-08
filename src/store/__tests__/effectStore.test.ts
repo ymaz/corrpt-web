@@ -30,7 +30,7 @@ registerEffect(testDef);
 
 describe("effectStore", () => {
 	beforeEach(() => {
-		useEffectStore.setState({ effects: [], previewMode: "full" });
+		useEffectStore.setState({ effects: [], previewMode: "full", time: 0 });
 	});
 
 	it("starts with no effects after reset", () => {
@@ -129,6 +129,11 @@ describe("effectStore", () => {
 	it("setPreviewMode updates previewMode", () => {
 		useEffectStore.getState().setPreviewMode("split");
 		expect(useEffectStore.getState().previewMode).toBe("split");
+	});
+
+	it("setTime updates time", () => {
+		useEffectStore.getState().setTime(1.5);
+		expect(useEffectStore.getState().time).toBe(1.5);
 	});
 
 	it("duplicateEffect copies current parameter values into the new instance", () => {
