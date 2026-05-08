@@ -3,7 +3,10 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 
 import "@/components/canvas/EffectMaterial";
-import { renderEffectChain } from "@/effects/renderEffectChain";
+import {
+	createEffectChainRenderer,
+	type EffectChainRenderer,
+} from "@/engine/createEffectChainRenderer";
 import { useEffectStore } from "@/store/effectStore";
 import { useImageStore } from "@/store/imageStore";
 
@@ -13,6 +16,8 @@ interface EffectPipelineProps {
 
 export function EffectPipeline({ texture }: EffectPipelineProps) {
 	const materialRef = useRef<THREE.ShaderMaterial>(null);
+	const rendererRef = useRef<EffectChainRenderer | null>(null);
+	const timeRef = useRef(0);
 	const { viewport, gl } = useThree();
 
 	// dimensions is always set in the same set() call as texture, and this
@@ -34,78 +39,33 @@ export function EffectPipeline({ texture }: EffectPipelineProps) {
 		scaleX = viewport.height * imageAspect;
 	}
 
-	// Ping-pong FBOs at image dimensions
-	const fbos = useMemo(() => {
-		const options: THREE.RenderTargetOptions = {
-			minFilter: THREE.LinearFilter,
-			magFilter: THREE.LinearFilter,
-			format: THREE.RGBAFormat,
-			type: THREE.UnsignedByteType,
-		};
-		const a = new THREE.WebGLRenderTarget(imageWidth, imageHeight, options);
-		const b = new THREE.WebGLRenderTarget(imageWidth, imageHeight, options);
-		return [a, b] as const;
-	}, [imageWidth, imageHeight]);
-
-	// Dispose FBOs on cleanup
 	useEffect(() => {
-		return () => {
-			fbos[0].dispose();
-			fbos[1].dispose();
-		};
-	}, [fbos]);
+		if (!materialRef.current) return;
 
-	// Off-screen scene for multi-pass rendering
-	const offScreen = useMemo(() => {
-		const scene = new THREE.Scene();
-		const camera = new THREE.OrthographicCamera(-0.5, 0.5, 0.5, -0.5, 0.1, 10);
-		camera.position.set(0, 0, 1);
-		const geometry = new THREE.PlaneGeometry(1, 1);
-		const mesh = new THREE.Mesh(geometry);
-		scene.add(mesh);
-		return { scene, camera, mesh, geometry };
-	}, []);
+		const renderer = createEffectChainRenderer({
+			gl,
+			outputMaterial: materialRef.current,
+		});
+		rendererRef.current = renderer;
 
-	// Dispose off-screen geometry on unmount
-	useEffect(() => {
-		return () => {
-			offScreen.geometry.dispose();
-		};
-	}, [offScreen]);
-
-	// Material cache: effect ID → ShaderMaterial
-	const materialCacheRef = useRef<Map<string, THREE.ShaderMaterial>>(new Map());
-
-	// Clean up materials for effects no longer active
-	const activeEffects = useEffectStore((s) => s.activeEffects);
-
-	useEffect(() => {
-		const cache = materialCacheRef.current;
-		const activeSet = new Set(activeEffects);
-		for (const [id, mat] of cache) {
-			if (!activeSet.has(id)) {
-				mat.dispose();
-				cache.delete(id);
-			}
+		const imageState = useImageStore.getState();
+		const effectState = useEffectStore.getState();
+		renderer.setImage(imageState.texture);
+		if (imageState.dimensions) {
+			renderer.resize(
+				imageState.dimensions.width,
+				imageState.dimensions.height,
+			);
 		}
-	}, [activeEffects]);
+		renderer.setEffects(effectState.activeEffects, effectState.parameters);
 
-	// Dispose all cached materials on unmount
-	useEffect(() => {
-		const cache = materialCacheRef.current;
 		return () => {
-			for (const mat of cache.values()) {
-				mat.dispose();
+			renderer.dispose();
+			if (rendererRef.current === renderer) {
+				rendererRef.current = null;
 			}
-			cache.clear();
 		};
-	}, []);
-
-	// Elapsed time accumulator
-	const timeRef = useRef(0);
-
-	// Reusable Vector2 for resolution uniform — avoids per-frame allocation
-	const resolutionRef = useRef(new THREE.Vector2());
+	}, [gl]);
 
 	// Stable Vector2 for JSX prop — avoids per-render allocation
 	const initialResolution = useMemo(
@@ -113,34 +73,22 @@ export function EffectPipeline({ texture }: EffectPipelineProps) {
 		[imageWidth, imageHeight],
 	);
 
+	useEffect(() => {
+		rendererRef.current?.setImage(texture);
+	}, [texture]);
+
+	useEffect(() => {
+		rendererRef.current?.resize(imageWidth, imageHeight);
+	}, [imageHeight, imageWidth]);
+
 	useFrame((_state, delta) => {
 		timeRef.current += delta;
-
-		if (!materialRef.current) return;
+		const renderer = rendererRef.current;
+		if (!renderer) return;
 
 		const { activeEffects, parameters } = useEffectStore.getState();
-
-		// No active effects — display original texture directly
-		if (activeEffects.length === 0) {
-			materialRef.current.uniforms.u_texture.value = texture;
-			return;
-		}
-
-		resolutionRef.current.set(imageWidth, imageHeight);
-
-		const outputTexture = renderEffectChain({
-			gl,
-			texture,
-			activeEffects,
-			parameters,
-			fbos,
-			offScreen,
-			materialCache: materialCacheRef.current,
-			resolution: resolutionRef.current,
-			time: timeRef.current,
-		});
-
-		materialRef.current.uniforms.u_texture.value = outputTexture;
+		renderer.setEffects(activeEffects, parameters);
+		renderer.renderFrame(timeRef.current);
 	});
 
 	return (
