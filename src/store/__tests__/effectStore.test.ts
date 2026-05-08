@@ -130,4 +130,41 @@ describe("effectStore", () => {
 		useEffectStore.getState().setPreviewMode("split");
 		expect(useEffectStore.getState().previewMode).toBe("split");
 	});
+
+	it("duplicateEffect copies current parameter values into the new instance", () => {
+		useEffectStore.getState().addEffect(TEST_EFFECT_ID);
+		const instanceId = useEffectStore.getState().effects[0].instanceId;
+		useEffectStore.getState().setEffectParam(instanceId, "intensity", 0.75);
+		useEffectStore.getState().duplicateEffect(instanceId);
+		expect(useEffectStore.getState().effects[1].parameters.intensity).toBe(0.75);
+	});
+
+	it("duplicateEffect parameters are independent — mutating original does not affect the copy", () => {
+		useEffectStore.getState().addEffect(TEST_EFFECT_ID);
+		const instanceId = useEffectStore.getState().effects[0].instanceId;
+		useEffectStore.getState().duplicateEffect(instanceId);
+		useEffectStore.getState().setEffectParam(instanceId, "intensity", 0.99);
+		expect(useEffectStore.getState().effects[1].parameters.intensity).toBe(0.5);
+	});
+
+	it("reorderEffects is a no-op when input contains duplicate instanceIds", () => {
+		useEffectStore.getState().addEffect(TEST_EFFECT_ID);
+		useEffectStore.getState().addEffect(TEST_EFFECT_ID);
+		const before = useEffectStore.getState().effects.map((e) => e.instanceId);
+		useEffectStore.getState().reorderEffects([before[0], before[0]]);
+		const after = useEffectStore.getState().effects.map((e) => e.instanceId);
+		expect(after).toEqual(before);
+	});
+
+	it("setEffectParam is a no-op for an unknown instanceId", () => {
+		useEffectStore.getState().addEffect(TEST_EFFECT_ID);
+		useEffectStore.getState().setEffectParam("nonexistent", "intensity", 0.99);
+		expect(useEffectStore.getState().effects[0].parameters.intensity).toBe(0.5);
+	});
+
+	it("duplicateEffect is a no-op for an unknown instanceId", () => {
+		useEffectStore.getState().addEffect(TEST_EFFECT_ID);
+		useEffectStore.getState().duplicateEffect("nonexistent");
+		expect(useEffectStore.getState().effects).toHaveLength(1);
+	});
 });

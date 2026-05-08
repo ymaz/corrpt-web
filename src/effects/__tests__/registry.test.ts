@@ -29,14 +29,25 @@ describe("registry", () => {
 		expect(getAllEffects()).toContainEqual(def);
 	});
 
-	it("overwrites existing effect on re-register", () => {
+	it("overwrites existing effect on re-register — getEffect reflects new definition", () => {
 		registerEffect(makeEffect("reg-test-overwrite"));
 		const updated = { ...makeEffect("reg-test-overwrite"), name: "updated" };
 		registerEffect(updated);
 		expect(getEffect("reg-test-overwrite")?.name).toBe("updated");
 	});
 
-	it("getAllEffects returns an array", () => {
-		expect(Array.isArray(getAllEffects())).toBe(true);
+	it("getAllEffects reflects updated definition after re-register", () => {
+		registerEffect(makeEffect("reg-test-overwrite-all"));
+		const updated = { ...makeEffect("reg-test-overwrite-all"), name: "updated-all" };
+		registerEffect(updated);
+		const all = getAllEffects();
+		const found = all.find((e) => e.id === "reg-test-overwrite-all");
+		expect(found?.name).toBe("updated-all");
+	});
+
+	it("getAllEffects returns a new array each call (not the internal iterator)", () => {
+		const a = getAllEffects();
+		const b = getAllEffects();
+		expect(a).not.toBe(b);
 	});
 });
