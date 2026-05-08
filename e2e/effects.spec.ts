@@ -53,9 +53,6 @@ test.describe("effects", () => {
 			page.getByTestId(paramSlider(instanceId, "angle")),
 		).toBeVisible();
 		await expect(
-			page.getByTestId(paramBool(instanceId, "animated")),
-		).toBeVisible();
-		await expect(
 			page.getByTestId(paramValue(instanceId, "intensity")),
 		).toHaveText("0.50");
 		await expect(page.getByTestId(paramValue(instanceId, "angle"))).toHaveText(

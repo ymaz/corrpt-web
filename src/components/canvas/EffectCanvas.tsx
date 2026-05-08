@@ -17,6 +17,7 @@ export function EffectCanvas({ className }: EffectCanvasProps) {
 	return (
 		<CanvasErrorBoundary resetKey={originalUrl}>
 			<Canvas
+				frameloop="demand"
 				className={className}
 				orthographic
 				linear

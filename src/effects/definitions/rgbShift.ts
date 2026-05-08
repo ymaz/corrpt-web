@@ -27,12 +27,6 @@ const rgbShift: EffectDefinition = {
 			step: 0.01,
 			label: "Angle",
 		},
-		{
-			name: "animated",
-			type: "bool",
-			default: false,
-			label: "Animated",
-		},
 	],
 	vertexShader,
 	fragmentShader,

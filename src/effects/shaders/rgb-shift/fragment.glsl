@@ -3,12 +3,11 @@ uniform vec2 u_resolution;
 uniform float u_time;
 uniform float u_intensity;
 uniform float u_angle;
-uniform float u_animated;
 
 varying vec2 vUv;
 
 void main() {
-  float angle = u_angle + u_animated * u_time;
+  float angle = u_angle;
   vec2 dir = vec2(cos(angle), sin(angle));
   vec2 offset = dir * u_intensity * 0.02;
 

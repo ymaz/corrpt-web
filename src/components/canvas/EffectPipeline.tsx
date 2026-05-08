@@ -17,7 +17,7 @@ interface EffectPipelineProps {
 export function EffectPipeline({ texture }: EffectPipelineProps) {
 	const materialRef = useRef<THREE.ShaderMaterial>(null);
 	const rendererRef = useRef<EffectChainRenderer | null>(null);
-	const { viewport, gl } = useThree();
+	const { viewport, gl, invalidate } = useThree();
 
 	// dimensions is always set in the same set() call as texture, and this
 	// component only renders when texture exists (guarded by parent)
@@ -26,6 +26,12 @@ export function EffectPipeline({ texture }: EffectPipelineProps) {
 	) as { width: number; height: number };
 	const imageAspect = imageWidth / imageHeight;
 	const viewportAspect = viewport.width / viewport.height;
+
+	useEffect(() => {
+		return useEffectStore.subscribe((state, prev) => {
+			if (state.effects !== prev.effects) invalidate();
+		});
+	}, [invalidate]);
 
 	let scaleX: number;
 	let scaleY: number;
@@ -74,6 +80,7 @@ export function EffectPipeline({ texture }: EffectPipelineProps) {
 			);
 		}
 		renderer.setEffects(effectState.effects);
+		invalidate();
 
 		return () => {
 			renderer.dispose();
@@ -81,7 +88,7 @@ export function EffectPipeline({ texture }: EffectPipelineProps) {
 				rendererRef.current = null;
 			}
 		};
-	}, [gl]);
+	}, [gl, invalidate]);
 
 	// Stable Vector2 for JSX prop — avoids per-render allocation
 	const initialResolution = useMemo(
@@ -91,11 +98,13 @@ export function EffectPipeline({ texture }: EffectPipelineProps) {
 
 	useEffect(() => {
 		rendererRef.current?.setImage(texture);
-	}, [texture]);
+		invalidate();
+	}, [texture, invalidate]);
 
 	useEffect(() => {
 		rendererRef.current?.resize(previewWidth, previewHeight);
-	}, [previewWidth, previewHeight]);
+		invalidate();
+	}, [previewWidth, previewHeight, invalidate]);
 
 	useFrame((_state, delta) => {
 		const store = useEffectStore.getState();
