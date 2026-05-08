@@ -4,7 +4,7 @@ import { renderEffectChain } from "@/effects/renderEffectChain";
 import passthroughFrag from "@/effects/shaders/common/passthrough.frag";
 import passthroughVert from "@/effects/shaders/common/passthrough.vert";
 import type { EffectInstance } from "@/effects/types";
-import { RENDERER_SETTINGS } from "@/lib/constants";
+import { LOSSY_EXPORT_QUALITY, RENDERER_SETTINGS } from "@/lib/constants";
 
 export interface ExportOptions {
 	texture: THREE.Texture;
@@ -93,7 +93,7 @@ export function exportImage(options: ExportOptions): Promise<void> {
 
 	// Convert canvas to blob and trigger download
 	const ext = MIME_TO_EXT[mimeType] || "png";
-	const quality = mimeType === "image/jpeg" ? 0.92 : undefined;
+	const quality = mimeType === "image/png" ? undefined : LOSSY_EXPORT_QUALITY;
 
 	const cleanup = () => {
 		geometry.dispose();
