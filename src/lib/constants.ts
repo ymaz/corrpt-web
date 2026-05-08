@@ -1,10 +1,14 @@
 import type { WebGLRendererParameters } from "three";
 
 export const RENDERER_SETTINGS: WebGLRendererParameters = {
-	preserveDrawingBuffer: true,
 	alpha: true,
 	antialias: false,
 	powerPreference: "high-performance",
+};
+
+export const EXPORT_RENDERER_SETTINGS: WebGLRendererParameters = {
+	...RENDERER_SETTINGS,
+	preserveDrawingBuffer: true,
 };
 
 export const SUPPORTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];

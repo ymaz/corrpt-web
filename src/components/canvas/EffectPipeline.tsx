@@ -38,6 +38,23 @@ export function EffectPipeline({ texture }: EffectPipelineProps) {
 		scaleX = viewport.height * imageAspect;
 	}
 
+	// Cap FBO at 2× physical canvas pixels — prevents full-res GPU work when a
+	// large image is displayed in a small viewport. Export always uses full res.
+	const { previewWidth, previewHeight } = useMemo(() => {
+		const capW = Math.round(viewport.width * viewport.dpr * 2);
+		const capH = Math.round(viewport.height * viewport.dpr * 2);
+		const scale = Math.min(capW / imageWidth, capH / imageHeight, 1);
+		return {
+			previewWidth: Math.max(1, Math.round(imageWidth * scale)),
+			previewHeight: Math.max(1, Math.round(imageHeight * scale)),
+		};
+	}, [imageWidth, imageHeight, viewport.width, viewport.height, viewport.dpr]);
+
+	// Ref so the mount effect always reads the latest preview size without
+	// needing it as a dep (which would teardown the renderer on every resize).
+	const previewDimsRef = useRef({ width: previewWidth, height: previewHeight });
+	previewDimsRef.current = { width: previewWidth, height: previewHeight };
+
 	useEffect(() => {
 		if (!materialRef.current) return;
 
@@ -52,8 +69,8 @@ export function EffectPipeline({ texture }: EffectPipelineProps) {
 		renderer.setImage(imageState.texture);
 		if (imageState.dimensions) {
 			renderer.resize(
-				imageState.dimensions.width,
-				imageState.dimensions.height,
+				previewDimsRef.current.width,
+				previewDimsRef.current.height,
 			);
 		}
 		renderer.setEffects(effectState.effects);
@@ -68,8 +85,8 @@ export function EffectPipeline({ texture }: EffectPipelineProps) {
 
 	// Stable Vector2 for JSX prop — avoids per-render allocation
 	const initialResolution = useMemo(
-		() => new THREE.Vector2(imageWidth, imageHeight),
-		[imageWidth, imageHeight],
+		() => new THREE.Vector2(previewWidth, previewHeight),
+		[previewWidth, previewHeight],
 	);
 
 	useEffect(() => {
@@ -77,8 +94,8 @@ export function EffectPipeline({ texture }: EffectPipelineProps) {
 	}, [texture]);
 
 	useEffect(() => {
-		rendererRef.current?.resize(imageWidth, imageHeight);
-	}, [imageHeight, imageWidth]);
+		rendererRef.current?.resize(previewWidth, previewHeight);
+	}, [previewWidth, previewHeight]);
 
 	useFrame((_state, delta) => {
 		const store = useEffectStore.getState();

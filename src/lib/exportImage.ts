@@ -4,7 +4,10 @@ import { renderEffectChain } from "@/effects/renderEffectChain";
 import passthroughFrag from "@/effects/shaders/common/passthrough.frag";
 import passthroughVert from "@/effects/shaders/common/passthrough.vert";
 import type { EffectInstance } from "@/effects/types";
-import { LOSSY_EXPORT_QUALITY, RENDERER_SETTINGS } from "@/lib/constants";
+import {
+	EXPORT_RENDERER_SETTINGS,
+	LOSSY_EXPORT_QUALITY,
+} from "@/lib/constants";
 
 export interface ExportOptions {
 	texture: THREE.Texture;
@@ -36,7 +39,7 @@ export function exportImage(options: ExportOptions): Promise<void> {
 
 	const renderer = new THREE.WebGLRenderer({
 		canvas,
-		...RENDERER_SETTINGS,
+		...EXPORT_RENDERER_SETTINGS,
 	});
 	renderer.setSize(width, height, false);
 
