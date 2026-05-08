@@ -15,8 +15,12 @@ dist-ssr
 # Claude Code local settings
 .claude/
 
+.air/
+
 # Test artifacts (generated)
-test-assets/screenshots/
+/playwright-report/
+/test-results/
+/playwright/.cache/
 
 # Editor directories and files
 .vscode/*
