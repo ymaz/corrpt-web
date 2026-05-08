@@ -7,6 +7,7 @@ import { exportImage } from "@/lib/exportImage";
 import {
 	DOWNLOAD_BUTTON,
 	IMAGE_ERROR,
+	IMAGE_WARNING,
 	REPLACE_FILE_INPUT,
 	REPLACE_IMAGE_BUTTON,
 } from "@/lib/test-ids";
@@ -25,6 +26,7 @@ export function ImageActions() {
 		mimeType,
 		isLoading,
 		error,
+		warning,
 		loadImage,
 	} = useImageStore(
 		useShallow((s) => ({
@@ -34,6 +36,7 @@ export function ImageActions() {
 			mimeType: s.mimeType,
 			isLoading: s.isLoading,
 			error: s.error,
+			warning: s.warning,
 			loadImage: s.loadImage,
 		})),
 	);
@@ -121,6 +124,14 @@ export function ImageActions() {
 			{(error || exportError) && (
 				<p data-testid={IMAGE_ERROR} className="text-sm text-red-400">
 					{[error, exportError].filter(Boolean).join(" ")}
+				</p>
+			)}
+			{warning && !error && !exportError && (
+				<p
+					data-testid={IMAGE_WARNING}
+					className="max-w-xs text-sm text-amber-400"
+				>
+					{warning}
 				</p>
 			)}
 

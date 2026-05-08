@@ -7,6 +7,7 @@ export const REPLACE_IMAGE_BUTTON = "replace-image-button";
 export const REPLACE_FILE_INPUT = "replace-file-input";
 export const DOWNLOAD_BUTTON = "download-button";
 export const IMAGE_ERROR = "image-error";
+export const IMAGE_WARNING = "image-warning";
 
 // Effect dev panel
 export const EFFECT_DEV_PANEL = "effect-dev-panel";

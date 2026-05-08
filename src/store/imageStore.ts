@@ -1,10 +1,16 @@
 import * as THREE from "three";
 import { create } from "zustand";
 
-import { MAX_FILE_SIZE, SUPPORTED_IMAGE_TYPES } from "@/lib/constants";
+import {
+	MAX_DIMENSION,
+	MAX_FILE_SIZE,
+	MAX_PIXEL_COUNT,
+	SUPPORTED_IMAGE_TYPES,
+} from "@/lib/constants";
 import type { ImageStore } from "@/store/types";
 
 let loadGeneration = 0;
+let currentBitmap: ImageBitmap | null = null;
 
 export const useImageStore = create<ImageStore>((set, get) => ({
 	texture: null,
@@ -14,11 +20,16 @@ export const useImageStore = create<ImageStore>((set, get) => ({
 	mimeType: null,
 	isLoading: false,
 	error: null,
+	warning: null,
 
 	clearImage: () => {
 		const { texture, originalUrl } = get();
 		if (texture) {
 			texture.dispose();
+		}
+		if (currentBitmap) {
+			currentBitmap.close();
+			currentBitmap = null;
 		}
 		if (originalUrl) {
 			URL.revokeObjectURL(originalUrl);
@@ -31,6 +42,7 @@ export const useImageStore = create<ImageStore>((set, get) => ({
 			mimeType: null,
 			isLoading: false,
 			error: null,
+			warning: null,
 		});
 	},
 
@@ -55,42 +67,83 @@ export const useImageStore = create<ImageStore>((set, get) => ({
 
 		// Dispose previous texture and reset state
 		get().clearImage();
-		set({ isLoading: true, error: null });
+		set({ isLoading: true });
 
 		loadGeneration++;
 		const gen = loadGeneration;
 
 		const objectUrl = URL.createObjectURL(file);
-		// EXIF orientation is applied natively by target browsers
-		// (Chrome 81+, Firefox 77+, Safari 14+) during HTMLImageElement
-		// decode, so img.width/height and pixel data are already rotated.
-		const img = new Image();
 
-		img.onload = () => {
-			if (gen !== loadGeneration) return;
+		(async () => {
+			try {
+				// Decode at full size first to read dimensions
+				const rawBitmap = await createImageBitmap(file, {
+					imageOrientation: "from-image",
+				});
+				const rawW = rawBitmap.width;
+				const rawH = rawBitmap.height;
 
-			const tex = new THREE.Texture(img);
-			tex.needsUpdate = true;
-			tex.colorSpace = THREE.NoColorSpace;
-			tex.minFilter = THREE.LinearFilter;
-			tex.magFilter = THREE.LinearFilter;
+				// Compute scale that satisfies both the per-axis dimension cap and
+				// the total pixel budget; clamp to 1 so we never upscale.
+				const scale = Math.min(
+					MAX_DIMENSION / rawW,
+					MAX_DIMENSION / rawH,
+					Math.sqrt(MAX_PIXEL_COUNT / (rawW * rawH)),
+					1,
+				);
 
-			set({
-				texture: tex,
-				dimensions: { width: img.width, height: img.height },
-				originalUrl: objectUrl,
-				fileName: baseName,
-				mimeType: file.type,
-				isLoading: false,
-			});
-		};
+				let bitmap: ImageBitmap;
+				let warning: string | null = null;
 
-		img.onerror = () => {
-			if (gen !== loadGeneration) return;
-			URL.revokeObjectURL(objectUrl);
-			set({ error: "Failed to decode image.", isLoading: false });
-		};
+				if (scale < 1) {
+					const newW = Math.round(rawW * scale);
+					const newH = Math.round(rawH * scale);
+					rawBitmap.close(); // release full-size allocation immediately
+					bitmap = await createImageBitmap(file, {
+						resizeWidth: newW,
+						resizeHeight: newH,
+						resizeQuality: "high",
+						imageOrientation: "from-image",
+					});
+					warning = `Downscaled from ${rawW}×${rawH} to ${newW}×${newH} — original exceeds the 16 MP GPU memory budget.`;
+				} else {
+					bitmap = rawBitmap;
+				}
 
-		img.src = objectUrl;
+				if (gen !== loadGeneration) {
+					bitmap.close();
+					URL.revokeObjectURL(objectUrl);
+					return;
+				}
+
+				currentBitmap = bitmap;
+				const tex = new THREE.Texture(bitmap);
+				tex.needsUpdate = true;
+				tex.colorSpace = THREE.NoColorSpace;
+				tex.minFilter = THREE.LinearFilter;
+				tex.magFilter = THREE.LinearFilter;
+				tex.onUpdate = () => {
+					if (currentBitmap === bitmap) {
+						currentBitmap.close();
+						currentBitmap = null;
+					}
+					tex.onUpdate = null;
+				};
+
+				set({
+					texture: tex,
+					dimensions: { width: bitmap.width, height: bitmap.height },
+					originalUrl: objectUrl,
+					fileName: baseName,
+					mimeType: file.type,
+					isLoading: false,
+					warning,
+				});
+			} catch {
+				URL.revokeObjectURL(objectUrl);
+				if (gen !== loadGeneration) return;
+				set({ error: "Failed to decode image.", isLoading: false });
+			}
+		})();
 	},
 }));

@@ -21,6 +21,7 @@ export interface ImageState {
 	mimeType: string | null;
 	isLoading: boolean;
 	error: string | null;
+	warning: string | null;
 }
 
 export interface ImageActions {
