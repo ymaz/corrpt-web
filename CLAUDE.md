@@ -12,6 +12,7 @@ React 19 + TypeScript 5 · Vite 5 · Three.js r160+ / @react-three/fiber / @reac
 npm run dev      # dev server
 npm run build    # tsc + production build
 npm run lint     # Biome check
+npm run lint:fix # Biome auto-fix formatting and safe lint issues — run before every commit
 npm test         # Vitest unit tests
 npm run test:e2e # playwright test
 ```

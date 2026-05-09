@@ -5,7 +5,6 @@ import {
 	EFFECT_DEV_PANEL,
 	effectSection,
 	effectToggle,
-	paramBool,
 	paramSlider,
 	paramValue,
 } from "../src/lib/test-ids";

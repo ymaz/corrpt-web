@@ -38,7 +38,10 @@ describe("registry", () => {
 
 	it("getAllEffects reflects updated definition after re-register", () => {
 		registerEffect(makeEffect("reg-test-overwrite-all"));
-		const updated = { ...makeEffect("reg-test-overwrite-all"), name: "updated-all" };
+		const updated = {
+			...makeEffect("reg-test-overwrite-all"),
+			name: "updated-all",
+		};
 		registerEffect(updated);
 		const all = getAllEffects();
 		const found = all.find((e) => e.id === "reg-test-overwrite-all");

@@ -49,7 +49,11 @@ export const useEffectStore = create<EffectStore>((set, get) => ({
 
 	addEffect: (effectId: string) => {
 		const { effects } = get();
-		if (effects.filter((e) => e.effectId === effectId).length >= MAX_EFFECT_INSTANCES) return;
+		if (
+			effects.filter((e) => e.effectId === effectId).length >=
+			MAX_EFFECT_INSTANCES
+		)
+			return;
 		set({ effects: [...effects, createEffectInstance(effectId)] });
 	},
 
@@ -119,7 +123,11 @@ export const useEffectStore = create<EffectStore>((set, get) => ({
 		if (sourceIndex === -1) return;
 
 		const source = effects[sourceIndex];
-		if (effects.filter((e) => e.effectId === source.effectId).length >= MAX_EFFECT_INSTANCES) return;
+		if (
+			effects.filter((e) => e.effectId === source.effectId).length >=
+			MAX_EFFECT_INSTANCES
+		)
+			return;
 		const duplicate: EffectInstance = {
 			...source,
 			instanceId: createInstanceId(source.effectId),

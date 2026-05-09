@@ -156,7 +156,9 @@ describe("effectStore", () => {
 		const instanceId = useEffectStore.getState().effects[0].instanceId;
 		useEffectStore.getState().setEffectParam(instanceId, "intensity", 0.75);
 		useEffectStore.getState().duplicateEffect(instanceId);
-		expect(useEffectStore.getState().effects[1].parameters.intensity).toBe(0.75);
+		expect(useEffectStore.getState().effects[1].parameters.intensity).toBe(
+			0.75,
+		);
 	});
 
 	it("duplicateEffect parameters are independent — mutating original does not affect the copy", () => {

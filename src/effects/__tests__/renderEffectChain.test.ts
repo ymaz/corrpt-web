@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { describe, expect, it, vi } from "vitest";
-import { renderEffectChain } from "../renderEffectChain";
 import { registerEffect } from "../registry";
+import { renderEffectChain } from "../renderEffectChain";
 import type { EffectDefinition, EffectInstance } from "../types";
 
 const RC_EFFECT_ID = "rc-chain-effect";
@@ -47,10 +47,10 @@ function setup(
 	} as unknown as THREE.WebGLRenderer;
 	const texture = {} as THREE.Texture;
 	const fboTextures = [{} as THREE.Texture, {} as THREE.Texture];
-	const fbos = [
-		{ texture: fboTextures[0] },
-		{ texture: fboTextures[1] },
-	] as [THREE.WebGLRenderTarget, THREE.WebGLRenderTarget];
+	const fbos = [{ texture: fboTextures[0] }, { texture: fboTextures[1] }] as [
+		THREE.WebGLRenderTarget,
+		THREE.WebGLRenderTarget,
+	];
 
 	return {
 		params: {
@@ -124,14 +124,20 @@ describe("renderEffectChain", () => {
 
 	it("creates a ShaderMaterial and stores it in materialCache", () => {
 		const cache = new Map<string, THREE.ShaderMaterial>();
-		const { params } = setup([makeInstance({ instanceId: "rc-cache-1" })], cache);
+		const { params } = setup(
+			[makeInstance({ instanceId: "rc-cache-1" })],
+			cache,
+		);
 		renderEffectChain(params);
 		expect(cache.get("rc-cache-1")).toBeInstanceOf(THREE.ShaderMaterial);
 	});
 
 	it("reuses cached material on subsequent calls", () => {
 		const cache = new Map<string, THREE.ShaderMaterial>();
-		const { params } = setup([makeInstance({ instanceId: "rc-reuse-1" })], cache);
+		const { params } = setup(
+			[makeInstance({ instanceId: "rc-reuse-1" })],
+			cache,
+		);
 		renderEffectChain(params);
 		const mat = cache.get("rc-reuse-1");
 		renderEffectChain(params);
@@ -157,7 +163,12 @@ describe("renderEffectChain", () => {
 	it("maps bool parameter true → 1.0 in uniforms", () => {
 		const cache = new Map<string, THREE.ShaderMaterial>();
 		const { params } = setup(
-			[makeInstance({ instanceId: "rc-bool-t", parameters: { intensity: 0.5, active: true } })],
+			[
+				makeInstance({
+					instanceId: "rc-bool-t",
+					parameters: { intensity: 0.5, active: true },
+				}),
+			],
 			cache,
 		);
 		renderEffectChain(params);
@@ -167,7 +178,12 @@ describe("renderEffectChain", () => {
 	it("maps bool parameter false → 0.0 in uniforms", () => {
 		const cache = new Map<string, THREE.ShaderMaterial>();
 		const { params } = setup(
-			[makeInstance({ instanceId: "rc-bool-f", parameters: { intensity: 0.5, active: false } })],
+			[
+				makeInstance({
+					instanceId: "rc-bool-f",
+					parameters: { intensity: 0.5, active: false },
+				}),
+			],
 			cache,
 		);
 		renderEffectChain(params);
@@ -176,14 +192,20 @@ describe("renderEffectChain", () => {
 
 	it("sets u_time uniform from the time param", () => {
 		const cache = new Map<string, THREE.ShaderMaterial>();
-		const { params } = setup([makeInstance({ instanceId: "rc-time-1" })], cache);
+		const { params } = setup(
+			[makeInstance({ instanceId: "rc-time-1" })],
+			cache,
+		);
 		renderEffectChain(params);
 		expect(cache.get("rc-time-1")!.uniforms.u_time.value).toBe(1.5);
 	});
 
 	it("sets u_texture to original texture on the first pass", () => {
 		const cache = new Map<string, THREE.ShaderMaterial>();
-		const { params, texture } = setup([makeInstance({ instanceId: "rc-tex-1" })], cache);
+		const { params, texture } = setup(
+			[makeInstance({ instanceId: "rc-tex-1" })],
+			cache,
+		);
 		renderEffectChain(params);
 		expect(cache.get("rc-tex-1")!.uniforms.u_texture.value).toBe(texture);
 	});

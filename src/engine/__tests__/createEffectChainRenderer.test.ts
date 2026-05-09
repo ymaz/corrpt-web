@@ -203,7 +203,10 @@ describe("createEffectChainRenderer", () => {
 			renderer.renderFrame(0);
 			disposeSpy.mockClear();
 			renderer.setEffects([
-				makeInstance({ instanceId: "cecr-keep-a", parameters: { amount: 0.9 } }),
+				makeInstance({
+					instanceId: "cecr-keep-a",
+					parameters: { amount: 0.9 },
+				}),
 			]);
 			expect(disposeSpy).not.toHaveBeenCalled();
 		});
