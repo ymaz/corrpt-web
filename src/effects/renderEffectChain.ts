@@ -1,7 +1,7 @@
 import * as THREE from "three";
 
 import { getEffect } from "@/effects/registry";
-import type { EffectInstance } from "@/effects/types";
+import type { EffectDefinition, EffectInstance } from "@/effects/types";
 
 export interface RenderChainParams {
 	gl: THREE.WebGLRenderer;
@@ -12,6 +12,23 @@ export interface RenderChainParams {
 	materialCache: Map<string, THREE.ShaderMaterial>;
 	resolution: THREE.Vector2;
 	time: number;
+}
+
+// Keyed by effectId; built once per definition, never rebuilt.
+const enumMapCache = new Map<string, Map<string, Map<string, number>>>();
+
+function getEnumMaps(def: EffectDefinition): Map<string, Map<string, number>> {
+	let maps = enumMapCache.get(def.id);
+	if (!maps) {
+		maps = new Map();
+		for (const p of def.parameters) {
+			if (p.type === "enum") {
+				maps.set(p.name, new Map(p.options.map((o, i) => [o.value, i])));
+			}
+		}
+		enumMapCache.set(def.id, maps);
+	}
+	return maps;
 }
 
 /**
@@ -39,6 +56,8 @@ export function renderEffectChain(params: RenderChainParams): THREE.Texture {
 		const def = getEffect(effect.effectId);
 		if (!def) continue;
 
+		const enumMaps = getEnumMaps(def);
+
 		// Get or create cached material
 		let mat = materialCache.get(effect.instanceId);
 		if (!mat) {
@@ -57,11 +76,11 @@ export function renderEffectChain(params: RenderChainParams): THREE.Texture {
 					case "float":
 						uniforms[uniformName] = { value: p.default };
 						break;
-					case "enum": {
-						const idx = p.options.findIndex((o) => o.value === p.default);
-						uniforms[uniformName] = { value: idx >= 0 ? idx : 0 };
+					case "enum":
+						uniforms[uniformName] = {
+							value: enumMaps.get(p.name)?.get(p.default) ?? 0,
+						};
 						break;
-					}
 					case "vec2":
 						uniforms[uniformName] = {
 							value: new THREE.Vector2(p.default[0], p.default[1]),
@@ -92,41 +111,37 @@ export function renderEffectChain(params: RenderChainParams): THREE.Texture {
 		mat.uniforms.u_resolution.value.copy(resolution);
 		mat.uniforms.u_time.value = time;
 
-		// Update effect-specific uniforms from store instance parameters.
-		if (def.parameters.length > 0) {
-			for (const p of def.parameters) {
-				const uniformName = `u_${p.name}`;
-				if (!(uniformName in mat.uniforms)) continue;
-				const val = effect.parameters[p.name];
-				if (val === undefined) continue;
+		for (const p of def.parameters) {
+			const uniformName = `u_${p.name}`;
+			if (!(uniformName in mat.uniforms)) continue;
+			const val = effect.parameters[p.name];
+			if (val === undefined) continue;
 
-				switch (p.type) {
-					case "bool":
-						mat.uniforms[uniformName].value = val ? 1.0 : 0.0;
-						break;
-					case "int":
-					case "float":
-						mat.uniforms[uniformName].value = val;
-						break;
-					case "enum": {
-						const idx = p.options.findIndex((o) => o.value === val);
-						mat.uniforms[uniformName].value = idx >= 0 ? idx : 0;
-						break;
-					}
-					case "vec2": {
-						const v = val as [number, number];
-						(mat.uniforms[uniformName].value as THREE.Vector2).set(v[0], v[1]);
-						break;
-					}
-					case "color": {
-						const c = val as [number, number, number];
-						(mat.uniforms[uniformName].value as THREE.Vector3).set(
-							c[0],
-							c[1],
-							c[2],
-						);
-						break;
-					}
+			switch (p.type) {
+				case "bool":
+					mat.uniforms[uniformName].value = val ? 1.0 : 0.0;
+					break;
+				case "int":
+				case "float":
+					mat.uniforms[uniformName].value = val;
+					break;
+				case "enum":
+					mat.uniforms[uniformName].value =
+						enumMaps.get(p.name)?.get(val as string) ?? 0;
+					break;
+				case "vec2": {
+					const v = val as [number, number];
+					(mat.uniforms[uniformName].value as THREE.Vector2).set(v[0], v[1]);
+					break;
+				}
+				case "color": {
+					const c = val as [number, number, number];
+					(mat.uniforms[uniformName].value as THREE.Vector3).set(
+						c[0],
+						c[1],
+						c[2],
+					);
+					break;
 				}
 			}
 		}

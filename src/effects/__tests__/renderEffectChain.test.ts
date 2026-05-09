@@ -5,6 +5,7 @@ import { renderEffectChain } from "../renderEffectChain";
 import type { EffectDefinition, EffectInstance } from "../types";
 
 const RC_EFFECT_ID = "rc-chain-effect";
+const RC_ENUM_EFFECT_ID = "rc-enum-effect";
 
 registerEffect({
 	id: RC_EFFECT_ID,
@@ -22,6 +23,28 @@ registerEffect({
 			step: 0.01,
 		},
 		{ name: "active", label: "Active", type: "bool", default: false },
+	],
+	vertexShader: "",
+	fragmentShader: "",
+} satisfies EffectDefinition);
+
+registerEffect({
+	id: RC_ENUM_EFFECT_ID,
+	name: "RC Enum Test",
+	category: "noise",
+	description: "",
+	parameters: [
+		{
+			name: "mode",
+			label: "Mode",
+			type: "enum",
+			default: "b",
+			options: [
+				{ label: "A", value: "a" },
+				{ label: "B", value: "b" },
+				{ label: "C", value: "c" },
+			],
+		},
 	],
 	vertexShader: "",
 	fragmentShader: "",
@@ -215,5 +238,56 @@ describe("renderEffectChain", () => {
 			makeInstance({ effectId: "does-not-exist" }),
 		]);
 		expect(renderEffectChain(params)).toBe(texture);
+	});
+
+	it("maps enum default value to its option index on material init", () => {
+		const cache = new Map<string, THREE.ShaderMaterial>();
+		const { params } = setup(
+			[
+				{
+					instanceId: "rc-enum-init",
+					effectId: RC_ENUM_EFFECT_ID,
+					enabled: true,
+					parameters: { mode: "b" },
+				},
+			],
+			cache,
+		);
+		renderEffectChain(params);
+		expect(cache.get("rc-enum-init")!.uniforms.u_mode.value).toBe(1);
+	});
+
+	it("maps enum instance parameter to its option index", () => {
+		const cache = new Map<string, THREE.ShaderMaterial>();
+		const { params } = setup(
+			[
+				{
+					instanceId: "rc-enum-update",
+					effectId: RC_ENUM_EFFECT_ID,
+					enabled: true,
+					parameters: { mode: "c" },
+				},
+			],
+			cache,
+		);
+		renderEffectChain(params);
+		expect(cache.get("rc-enum-update")!.uniforms.u_mode.value).toBe(2);
+	});
+
+	it("falls back to 0 for an unknown enum value", () => {
+		const cache = new Map<string, THREE.ShaderMaterial>();
+		const { params } = setup(
+			[
+				{
+					instanceId: "rc-enum-unknown",
+					effectId: RC_ENUM_EFFECT_ID,
+					enabled: true,
+					parameters: { mode: "unknown" },
+				},
+			],
+			cache,
+		);
+		renderEffectChain(params);
+		expect(cache.get("rc-enum-unknown")!.uniforms.u_mode.value).toBe(0);
 	});
 });
