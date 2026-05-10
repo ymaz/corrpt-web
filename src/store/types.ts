@@ -3,17 +3,17 @@ import type * as THREE from "three";
 import type { EffectInstance, EffectParameterValue } from "@/effects/types";
 
 // Shared type aliases
-export type PreviewMode = "split" | "full" | "compare";
-export type ModalType = "export" | "camera" | "source";
-export type Theme = "dark" | "light";
+type PreviewMode = "split" | "full" | "compare";
+type ModalType = "export" | "camera" | "source";
+type Theme = "dark" | "light";
 
-export interface ImageDimensions {
+interface ImageDimensions {
 	width: number;
 	height: number;
 }
 
 // Image store
-export interface ImageState {
+interface ImageState {
 	texture: THREE.Texture | null;
 	dimensions: ImageDimensions | null;
 	originalUrl: string | null;
@@ -24,7 +24,7 @@ export interface ImageState {
 	warning: string | null;
 }
 
-export interface ImageActions {
+interface ImageActions {
 	loadImage: (file: File) => void;
 	clearImage: () => void;
 }
@@ -32,12 +32,12 @@ export interface ImageActions {
 export type ImageStore = ImageState & ImageActions;
 
 // Effect store
-export interface EffectState {
+interface EffectState {
 	effects: EffectInstance[];
 	previewMode: PreviewMode;
 }
 
-export interface EffectActions {
+interface EffectActions {
 	addEffect: (effectId: string) => void;
 	removeEffect: (instanceId: string) => void;
 	removeEffectsByEffectId: (effectId: string) => void;
@@ -54,13 +54,13 @@ export interface EffectActions {
 export type EffectStore = EffectState & EffectActions;
 
 // UI store
-export interface UIState {
+interface UIState {
 	sidebarOpen: boolean;
 	activeModal: ModalType | null;
 	theme: Theme;
 }
 
-export interface UIActions {
+interface UIActions {
 	toggleSidebar: () => void;
 	openModal: (modal: ModalType) => void;
 	closeModal: () => void;

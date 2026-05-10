@@ -4,7 +4,7 @@ interface BaseParamDef {
 	label: string;
 }
 
-export interface FloatParamDef extends BaseParamDef {
+interface FloatParamDef extends BaseParamDef {
 	type: "float";
 	default: number;
 	min: number;
@@ -12,25 +12,25 @@ export interface FloatParamDef extends BaseParamDef {
 	step: number;
 }
 
-export interface BoolParamDef extends BaseParamDef {
+interface BoolParamDef extends BaseParamDef {
 	type: "bool";
 	default: boolean;
 }
 
-export interface IntParamDef extends BaseParamDef {
+interface IntParamDef extends BaseParamDef {
 	type: "int";
 	default: number;
 	min: number;
 	max: number;
 }
 
-export interface EnumParamDef extends BaseParamDef {
+interface EnumParamDef extends BaseParamDef {
 	type: "enum";
 	default: string;
 	options: { label: string; value: string }[];
 }
 
-export interface Vec2ParamDef extends BaseParamDef {
+interface Vec2ParamDef extends BaseParamDef {
 	type: "vec2";
 	default: [number, number];
 	min?: [number, number];
@@ -38,7 +38,7 @@ export interface Vec2ParamDef extends BaseParamDef {
 	step?: [number, number];
 }
 
-export interface ColorParamDef extends BaseParamDef {
+interface ColorParamDef extends BaseParamDef {
 	type: "color";
 	default: [number, number, number];
 }
