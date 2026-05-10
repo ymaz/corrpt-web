@@ -8,6 +8,8 @@ export const RENDERER_SETTINGS: WebGLRendererParameters = {
 
 export const EXPORT_RENDERER_SETTINGS: WebGLRendererParameters = {
 	...RENDERER_SETTINGS,
+	// Required: WebGL may clear the drawing buffer after compositing; toBlob is
+	// async and reads pixels after the frame, so the buffer must be preserved.
 	preserveDrawingBuffer: true,
 };
 

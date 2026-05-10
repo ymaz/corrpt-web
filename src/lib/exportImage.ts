@@ -76,6 +76,8 @@ export function exportImage(options: ExportOptions): Promise<void> {
 	const ext = MIME_TO_EXT[mimeType] || "png";
 	const quality = mimeType === "image/png" ? undefined : LOSSY_EXPORT_QUALITY;
 
+	const resolution = new THREE.Vector2(width, height);
+
 	try {
 		const finalTexture = renderEffectChain({
 			gl: renderer,
@@ -84,7 +86,7 @@ export function exportImage(options: ExportOptions): Promise<void> {
 			fbos,
 			offScreen: { scene, camera, mesh },
 			materialCache,
-			resolution: new THREE.Vector2(width, height),
+			resolution,
 			time,
 		});
 
@@ -93,7 +95,7 @@ export function exportImage(options: ExportOptions): Promise<void> {
 			fragmentShader: passthroughFrag,
 			uniforms: {
 				u_texture: { value: finalTexture },
-				u_resolution: { value: new THREE.Vector2(width, height) },
+				u_resolution: { value: resolution },
 				u_time: { value: 0 },
 			},
 		});
@@ -107,8 +109,15 @@ export function exportImage(options: ExportOptions): Promise<void> {
 	}
 
 	return new Promise((resolve, reject) => {
+		// Guard against browsers that silently drop the toBlob callback on context loss.
+		const timer = setTimeout(() => {
+			cleanup();
+			reject(new Error("Export timed out"));
+		}, 30_000);
+
 		canvas.toBlob(
 			(blob) => {
+				clearTimeout(timer);
 				if (!blob) {
 					cleanup();
 					reject(new Error("Failed to create blob for export"));
