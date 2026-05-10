@@ -25,19 +25,21 @@ export default defineConfig({
 		include: ["src/**/*.test.{ts,tsx}"],
 	},
 	build: {
-		rollupOptions: {
+		rolldownOptions: {
 			output: {
-				manualChunks(id) {
-					if (id.includes("node_modules/three/")) {
-						return "vendor-three";
-					}
-					if (
-						id.includes("node_modules/react/") ||
-						id.includes("node_modules/react-dom/") ||
-						id.includes("node_modules/@react-three/")
-					) {
-						return "vendor-react";
-					}
+				codeSplitting: {
+					minShareCount: 1,
+					groups: [
+						{
+							name: "vendor-three",
+							test: /node_modules[\\/]three[\\/]/,
+							priority: 10,
+						},
+						{
+							name: "vendor-react",
+							test: /node_modules[\\/](react|react-dom|@react-three)[\\/]/,
+						},
+					],
 				},
 			},
 		},
