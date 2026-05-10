@@ -61,11 +61,9 @@ export const useImageStore = create<ImageStore>((set, get) => ({
 			return;
 		}
 
-		// Extract filename without extension
 		const lastDot = file.name.lastIndexOf(".");
 		const baseName = lastDot > 0 ? file.name.slice(0, lastDot) : file.name;
 
-		// Dispose previous texture and reset state
 		get().clearImage();
 		set({ isLoading: true });
 
@@ -76,15 +74,20 @@ export const useImageStore = create<ImageStore>((set, get) => ({
 
 		(async () => {
 			try {
-				// Decode at full size first to read dimensions
 				const rawBitmap = await createImageBitmap(file, {
 					imageOrientation: "from-image",
 				});
 				const rawW = rawBitmap.width;
 				const rawH = rawBitmap.height;
 
-				// Compute scale that satisfies both the per-axis dimension cap and
-				// the total pixel budget; clamp to 1 so we never upscale.
+				if (gen !== loadGeneration) {
+					rawBitmap.close();
+					URL.revokeObjectURL(objectUrl);
+					return;
+				}
+
+				// Satisfies both the per-axis dimension cap and the total pixel
+				// budget; clamp to 1 so we never upscale.
 				const scale = Math.min(
 					MAX_DIMENSION / rawW,
 					MAX_DIMENSION / rawH,
@@ -92,14 +95,14 @@ export const useImageStore = create<ImageStore>((set, get) => ({
 					1,
 				);
 
-				let bitmap: ImageBitmap;
+				let scaledBitmap: ImageBitmap;
 				let warning: string | null = null;
 
 				if (scale < 1) {
 					const newW = Math.round(rawW * scale);
 					const newH = Math.round(rawH * scale);
 					rawBitmap.close(); // release full-size allocation immediately
-					bitmap = await createImageBitmap(file, {
+					scaledBitmap = await createImageBitmap(file, {
 						resizeWidth: newW,
 						resizeHeight: newH,
 						resizeQuality: "high",
@@ -107,23 +110,38 @@ export const useImageStore = create<ImageStore>((set, get) => ({
 					});
 					warning = `Downscaled from ${rawW}×${rawH} to ${newW}×${newH} — original exceeds the 16 MP GPU memory budget.`;
 				} else {
-					bitmap = rawBitmap;
+					scaledBitmap = rawBitmap;
 				}
 
 				if (gen !== loadGeneration) {
-					bitmap.close();
+					scaledBitmap.close();
 					URL.revokeObjectURL(objectUrl);
 					return;
 				}
 
-				currentBitmap = bitmap;
-				const tex = new THREE.Texture(bitmap);
+				// Three.js r152+ skips UNPACK_FLIP_Y_WEBGL for ImageBitmap sources,
+				// so tex.flipY has no effect. Pre-flip the bitmap for WebGL's
+				// bottom-left origin so UV (0,0) reads the bottom of the image.
+				const finalBitmap = await createImageBitmap(scaledBitmap, {
+					imageOrientation: "flipY",
+				});
+				scaledBitmap.close();
+
+				if (gen !== loadGeneration) {
+					finalBitmap.close();
+					URL.revokeObjectURL(objectUrl);
+					return;
+				}
+
+				currentBitmap = finalBitmap;
+				const tex = new THREE.Texture(finalBitmap);
 				tex.needsUpdate = true;
 				tex.colorSpace = THREE.NoColorSpace;
+				tex.flipY = false;
 				tex.minFilter = THREE.LinearFilter;
 				tex.magFilter = THREE.LinearFilter;
 				tex.onUpdate = () => {
-					if (currentBitmap === bitmap) {
+					if (currentBitmap === finalBitmap) {
 						currentBitmap.close();
 						currentBitmap = null;
 					}
@@ -132,7 +150,7 @@ export const useImageStore = create<ImageStore>((set, get) => ({
 
 				set({
 					texture: tex,
-					dimensions: { width: bitmap.width, height: bitmap.height },
+					dimensions: { width: finalBitmap.width, height: finalBitmap.height },
 					originalUrl: objectUrl,
 					fileName: baseName,
 					mimeType: file.type,

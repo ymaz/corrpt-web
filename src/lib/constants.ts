@@ -11,7 +11,13 @@ export const EXPORT_RENDERER_SETTINGS: WebGLRendererParameters = {
 	preserveDrawingBuffer: true,
 };
 
-export const SUPPORTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+export const MIME_TO_EXT: Record<string, string> = {
+	"image/jpeg": "jpg",
+	"image/png": "png",
+	"image/webp": "webp",
+};
+
+export const SUPPORTED_IMAGE_TYPES = Object.keys(MIME_TO_EXT);
 
 export const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 export const MAX_PIXEL_COUNT = 16_777_216; // 16 MP (~4096²) — GPU memory budget

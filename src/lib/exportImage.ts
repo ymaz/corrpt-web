@@ -7,6 +7,7 @@ import type { EffectInstance } from "@/effects/types";
 import {
 	EXPORT_RENDERER_SETTINGS,
 	LOSSY_EXPORT_QUALITY,
+	MIME_TO_EXT,
 } from "@/lib/constants";
 
 export interface ExportOptions {
@@ -17,12 +18,6 @@ export interface ExportOptions {
 	fileName: string;
 	time: number;
 }
-
-const MIME_TO_EXT: Record<string, string> = {
-	"image/jpeg": "jpg",
-	"image/png": "png",
-	"image/webp": "webp",
-};
 
 /**
  * Exports the current image with all active effects applied at full resolution.
@@ -64,43 +59,12 @@ export function exportImage(options: ExportOptions): Promise<void> {
 	const mesh = new THREE.Mesh(geometry);
 	scene.add(mesh);
 
-	// Material cache for effect chain
 	const materialCache = new Map<string, THREE.ShaderMaterial>();
 
-	// Run effect chain
-	const finalTexture = renderEffectChain({
-		gl: renderer,
-		texture,
-		effects,
-		fbos,
-		offScreen: { scene, camera, mesh },
-		materialCache,
-		resolution: new THREE.Vector2(width, height),
-		time,
-	});
-
-	// Create display material to render final texture to canvas
-	const displayMaterial = new THREE.ShaderMaterial({
-		vertexShader: passthroughVert,
-		fragmentShader: passthroughFrag,
-		uniforms: {
-			u_texture: { value: finalTexture },
-			u_resolution: { value: new THREE.Vector2(width, height) },
-			u_time: { value: 0 },
-		},
-	});
-
-	mesh.material = displayMaterial;
-	renderer.setRenderTarget(null);
-	renderer.render(scene, camera);
-
-	// Convert canvas to blob and trigger download
-	const ext = MIME_TO_EXT[mimeType] || "png";
-	const quality = mimeType === "image/png" ? undefined : LOSSY_EXPORT_QUALITY;
-
+	let displayMaterial: THREE.ShaderMaterial | undefined;
 	const cleanup = () => {
 		geometry.dispose();
-		displayMaterial.dispose();
+		displayMaterial?.dispose();
 		for (const mat of materialCache.values()) {
 			mat.dispose();
 		}
@@ -108,6 +72,39 @@ export function exportImage(options: ExportOptions): Promise<void> {
 		fbo1.dispose();
 		renderer.dispose();
 	};
+
+	const ext = MIME_TO_EXT[mimeType] || "png";
+	const quality = mimeType === "image/png" ? undefined : LOSSY_EXPORT_QUALITY;
+
+	try {
+		const finalTexture = renderEffectChain({
+			gl: renderer,
+			texture,
+			effects,
+			fbos,
+			offScreen: { scene, camera, mesh },
+			materialCache,
+			resolution: new THREE.Vector2(width, height),
+			time,
+		});
+
+		displayMaterial = new THREE.ShaderMaterial({
+			vertexShader: passthroughVert,
+			fragmentShader: passthroughFrag,
+			uniforms: {
+				u_texture: { value: finalTexture },
+				u_resolution: { value: new THREE.Vector2(width, height) },
+				u_time: { value: 0 },
+			},
+		});
+
+		mesh.material = displayMaterial;
+		renderer.setRenderTarget(null);
+		renderer.render(scene, camera);
+	} catch (error) {
+		cleanup();
+		return Promise.reject(error);
+	}
 
 	return new Promise((resolve, reject) => {
 		canvas.toBlob(
@@ -120,11 +117,9 @@ export function exportImage(options: ExportOptions): Promise<void> {
 
 				const url = URL.createObjectURL(blob);
 				const link = document.createElement("a");
-				const baseName = fileName.replace(/\.[^/.]+$/, "");
-
 				try {
 					link.href = url;
-					link.download = `${baseName}__corrpt.${ext}`;
+					link.download = `${fileName}__corrpt.${ext}`;
 					document.body.appendChild(link);
 					link.click();
 					resolve();
