@@ -7,7 +7,8 @@ const rgbShiftV2: EffectDefinition = {
 	id: "rgbShiftV2",
 	name: "RGB Shift V2",
 	category: "color",
-	description: "Aggressive chromatic split — G anchored, R/B offset with per-pixel jitter and per-row banding.",
+	description:
+		"Aggressive chromatic split — G anchored, R/B offset with per-pixel jitter and per-row banding.",
 	shortDescription: "signal corruption",
 	parameters: [
 		{

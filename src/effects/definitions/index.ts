@@ -1,4 +1,4 @@
-import "./crt";
+import "./crtV2";
 import "./noise";
 import "./passthrough";
 import "./pixelSort";
