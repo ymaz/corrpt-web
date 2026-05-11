@@ -7,8 +7,8 @@ const pixelSort: EffectDefinition = {
 	id: "pixelSort",
 	name: "Pixel Sort",
 	category: "aesthetic",
-	description:
-		"GPU-friendly pixel sorting approximation using brightness threshold and directional blur.",
+	description: "GPU-friendly pixel sorting approximation using brightness threshold and directional blur.",
+	shortDescription: "data melt",
 	parameters: [
 		{
 			name: "threshold",

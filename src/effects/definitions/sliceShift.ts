@@ -8,6 +8,7 @@ const sliceShift: EffectDefinition = {
 	name: "Slice Shift",
 	category: "distortion",
 	description: "Band displacement — classic glitch effect.",
+	shortDescription: "frame tear",
 	parameters: [
 		{
 			name: "intensity",

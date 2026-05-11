@@ -8,6 +8,7 @@ const noise: EffectDefinition = {
 	name: "Noise",
 	category: "aesthetic",
 	description: "Adds film grain or static noise to the image.",
+	shortDescription: "analogue static",
 	parameters: [
 		{
 			name: "intensity",

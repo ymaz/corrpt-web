@@ -8,6 +8,7 @@ const smear: EffectDefinition = {
 	name: "Smear",
 	category: "distortion",
 	description: "Brightness-based pixel stretching — datamosh approximation.",
+	shortDescription: "pixel drag",
 	parameters: [
 		{
 			name: "intensity",

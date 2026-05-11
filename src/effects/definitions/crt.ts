@@ -7,8 +7,8 @@ const crt: EffectDefinition = {
 	id: "crt",
 	name: "CRT",
 	category: "aesthetic",
-	description:
-		"Simulates retro CRT monitor with scanlines, curvature, and vignette.",
+	description: "Simulates retro CRT monitor with scanlines, curvature, and vignette.",
+	shortDescription: "phosphor glow",
 	parameters: [
 		{
 			name: "lineIntensity",

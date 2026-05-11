@@ -8,6 +8,7 @@ const rgbShift: EffectDefinition = {
 	name: "RGB Shift",
 	category: "color",
 	description: "Separates RGB channels and offsets them directionally.",
+	shortDescription: "hardware aberration",
 	parameters: [
 		{
 			name: "intensity",

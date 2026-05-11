@@ -72,6 +72,7 @@ export interface EffectDefinition {
 	name: string;
 	category: "distortion" | "color" | "noise" | "aesthetic";
 	description: string;
+	shortDescription?: string;
 	parameters: EffectParameterDef[];
 	vertexShader: string;
 	fragmentShader: string;

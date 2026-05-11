@@ -361,6 +361,10 @@ export function EffectDevPanel() {
 							{def.name}
 						</label>
 
+						{isActive && def.shortDescription && (
+							<p className="mb-2 text-xs italic">{def.shortDescription}</p>
+						)}
+
 						{isActive &&
 							keysForDef.map((key, index) => {
 								const instanceId = key.slice(0, key.lastIndexOf("|"));
