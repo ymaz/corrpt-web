@@ -53,10 +53,9 @@ describe("imageStore", () => {
 			expect(useImageStore.getState().texture).not.toBeNull(),
 		);
 
-		const hasFlipYCall = createImageBitmapMock.mock.calls.some(
-			([, opts]: [unknown, CreateImageBitmapOptions?]) =>
-				opts?.imageOrientation === "flipY",
-		);
+		const hasFlipYCall = (
+			createImageBitmapMock.mock.calls as [unknown, ImageBitmapOptions?][]
+		).some(([, opts]) => opts?.imageOrientation === "flipY");
 		expect(hasFlipYCall).toBe(true);
 	});
 
@@ -76,7 +75,7 @@ describe("imageStore", () => {
 
 		const calls = createImageBitmapMock.mock.calls as [
 			unknown,
-			CreateImageBitmapOptions?,
+			ImageBitmapOptions?,
 		][];
 		expect(calls).toHaveLength(3);
 		// Raw probe — EXIF correction, no resize
