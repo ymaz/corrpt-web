@@ -16,7 +16,9 @@ dist-ssr
 # Claude Code local settings
 .claude/
 
+# Random
 .air/
+__plans
 
 # Test artifacts (generated)
 /playwright-report/
