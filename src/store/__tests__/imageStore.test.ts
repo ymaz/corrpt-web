@@ -59,6 +59,29 @@ describe("imageStore", () => {
 		expect(hasFlipYCall).toBe(true);
 	});
 
+	async function loadFakeImage() {
+		useImageStore
+			.getState()
+			.loadImage(new File(["x"], "photo.jpg", { type: "image/jpeg" }));
+		await vi.waitFor(() =>
+			expect(useImageStore.getState().texture).not.toBeNull(),
+		);
+		return useImageStore.getState().texture!
+			.image as unknown as { close: ReturnType<typeof vi.fn> };
+	}
+
+	it("bitmap stays open after load — must remain valid for export in a separate WebGL context", async () => {
+		const finalBitmap = await loadFakeImage();
+		// export creates a second WebGL context that re-uploads this bitmap
+		expect(finalBitmap.close).not.toHaveBeenCalled();
+	});
+
+	it("clearImage closes the bitmap — memory is freed when the user loads a new image", async () => {
+		const finalBitmap = await loadFakeImage();
+		useImageStore.getState().clearImage();
+		expect(finalBitmap.close).toHaveBeenCalledOnce();
+	});
+
 	it("resize path: preserves imageOrientation: from-image on both initial and resize decodes, then flips", async () => {
 		// 5000×5000 = 25 MP > 16 MP budget → forces scale < 1 resize branch
 		createImageBitmapMock

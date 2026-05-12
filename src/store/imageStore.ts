@@ -140,13 +140,6 @@ export const useImageStore = create<ImageStore>((set, get) => ({
 				tex.flipY = false;
 				tex.minFilter = THREE.LinearFilter;
 				tex.magFilter = THREE.LinearFilter;
-				tex.onUpdate = () => {
-					if (currentBitmap === finalBitmap) {
-						currentBitmap.close();
-						currentBitmap = null;
-					}
-					tex.onUpdate = null;
-				};
 
 				set({
 					texture: tex,
