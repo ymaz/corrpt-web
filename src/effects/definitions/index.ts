@@ -1,5 +1,5 @@
 import "./crtV2";
-import "./noise";
+import "./noiseV2";
 import "./passthrough";
 import "./pixelSort";
 import "./rgbShift";
