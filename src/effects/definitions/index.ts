@@ -1,3 +1,4 @@
+import "./blockGlitch";
 import "./crtV2";
 import "./noiseV2";
 import "./passthrough";

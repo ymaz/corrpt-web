@@ -66,8 +66,9 @@ describe("imageStore", () => {
 		await vi.waitFor(() =>
 			expect(useImageStore.getState().texture).not.toBeNull(),
 		);
-		return useImageStore.getState().texture!
-			.image as unknown as { close: ReturnType<typeof vi.fn> };
+		return useImageStore.getState().texture!.image as unknown as {
+			close: ReturnType<typeof vi.fn>;
+		};
 	}
 
 	it("bitmap stays open after load — must remain valid for export in a separate WebGL context", async () => {
