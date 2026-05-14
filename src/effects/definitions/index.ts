@@ -1,4 +1,5 @@
 import "./blockGlitch";
+import "./chromaSlice";
 import "./crtV2";
 import "./noiseV2";
 import "./passthrough";
