@@ -1,6 +1,5 @@
 uniform sampler2D u_texture;
 uniform vec2 u_resolution;
-uniform float u_time;
 
 uniform float u_intensity;   // 0-1: smear length
 uniform float u_threshold;   // 0-1: brightness threshold for smear source
@@ -11,6 +10,8 @@ uniform float u_seed;        // 0-1000: randomization seed
 varying vec2 vUv;
 
 #include ../common/utils.glsl;
+
+const int MAX_SMEAR_PX = 150;
 
 void main() {
   vec4 original = texture2D(u_texture, vUv);
@@ -23,7 +24,7 @@ void main() {
   float randFactor = hash(vec2(floor(scanline * scanRes), u_seed));
 
   // Smear length in pixels, randomized per scanline
-  float maxDist = u_intensity * 150.0 * (0.5 + randFactor);
+  float maxDist = u_intensity * float(MAX_SMEAR_PX) * (0.5 + randFactor);
 
   // Direction to look backward (left or up)
   vec2 dir = mix(vec2(-1.0, 0.0), vec2(0.0, -1.0), vert);
@@ -40,7 +41,7 @@ void main() {
   float sourceDist = 0.0;
   bool foundSource = false;
 
-  for (int i = 1; i <= 150; i++) {
+  for (int i = 1; i <= MAX_SMEAR_PX; i++) {
     if (float(i) > maxDist) break;
 
     vec2 sampleUV = vUv + pixelStep * float(i);
