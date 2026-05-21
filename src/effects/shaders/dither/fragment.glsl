@@ -2,7 +2,7 @@ uniform sampler2D u_texture;
 uniform vec2 u_resolution;
 uniform float u_time;
 
-uniform float u_pixelSize;    // 1-16: block size in screen pixels
+uniform float u_pixelSize;    // 1-7: block size in screen pixels
 uniform float u_dither;       // 0-1: Bayer dither strength
 uniform float u_contrast;     // 0.5-2.5: pre-quantization contrast
 uniform float u_hue;          // 0-1: primary palette hue

@@ -16,8 +16,8 @@ const dither: EffectDefinition = {
 			type: "float",
 			default: 4,
 			min: 1,
-			max: 16,
-			step: 0.5,
+			max: 7,
+			step: 0.25,
 			label: "Pixel Size",
 		},
 		{
