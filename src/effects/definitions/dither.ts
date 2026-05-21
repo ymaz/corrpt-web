@@ -66,6 +66,14 @@ const dither: EffectDefinition = {
 			label: "Saturation",
 		},
 		{
+			name: "levels",
+			type: "int",
+			default: 4,
+			min: 2,
+			max: 6,
+			label: "Tones",
+		},
+		{
 			name: "intensity",
 			type: "float",
 			default: 1.0,

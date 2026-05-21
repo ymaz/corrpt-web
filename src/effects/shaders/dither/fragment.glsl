@@ -9,6 +9,7 @@ uniform float u_hue;          // 0-1: primary palette hue
 uniform float u_hueShift;     // 0-1: offset between primary and secondary hue
 uniform float u_saturation;   // 0-1.5: palette saturation
 uniform float u_intensity;    // 0-1: wet/dry blend with input — enables layering
+uniform float u_levels;       // 2-6: number of palette tones
 
 varying vec2 vUv;
 
@@ -31,6 +32,21 @@ vec3 hsv2rgb(vec3 c) {
   return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
 }
 
+// Palette for `level` of `levels` tones:
+//   level 0           -> black (shadow)
+//   level levels-1    -> white-tinted primary (highlight)
+//   middle levels     -> hue lerps from primary to primary+hueShift,
+//                        so N=4 reproduces the [black, primary, secondary, tint] look
+//                        and higher N inserts intermediate hues between them.
+vec3 paletteColor(int level, float levels) {
+  vec3 primary = hsv2rgb(vec3(u_hue, u_saturation, 1.0));
+  if (level <= 0) return vec3(0.0);
+  if (float(level) >= levels - 1.0) return mix(primary, vec3(1.0), 0.75);
+  // With only one middle slot (levels == 3) keep t = 0 so it lands on primary.
+  float t = levels > 3.5 ? float(level - 1) / (levels - 3.0) : 0.0;
+  return hsv2rgb(vec3(u_hue + u_hueShift * t, u_saturation, 1.0));
+}
+
 void main() {
   // Sample at center of pixelation block for the quantized output, and at
   // full resolution for the wet/dry blend (preserves upstream detail).
@@ -38,18 +54,13 @@ void main() {
   vec3 blockSrc = texture2D(u_texture, (block + 0.5) * u_pixelSize / u_resolution).rgb;
   vec3 fullSrc = texture2D(u_texture, vUv).rgb;
 
-  // Contrast-stretched luma + Bayer nudge sized to one tone step (1/3),
+  // Contrast-stretched luma + Bayer nudge sized to one quantization step,
   // so full-strength dither moves a value across exactly one boundary.
+  float steps = u_levels - 1.0;
   float luma = clamp((getBrightness(blockSrc) - 0.5) * u_contrast + 0.5, 0.0, 1.0);
-  float t = clamp(luma + bayer4x4(block) * u_dither / 3.0, 0.0, 1.0);
-  int level = int(t * 3.0 + 0.5);
+  float t = clamp(luma + bayer4x4(block) * u_dither / steps, 0.0, 1.0);
+  int level = int(t * steps + 0.5);
 
-  // 4-tone palette: black, primary, hue-shifted secondary, white-tinted primary.
-  vec3 primary = hsv2rgb(vec3(u_hue, u_saturation, 1.0));
-  vec3 dithered = vec3(0.0);
-  if (level == 1) dithered = primary;
-  else if (level == 2) dithered = hsv2rgb(vec3(u_hue + u_hueShift, u_saturation, 1.0));
-  else if (level == 3) dithered = mix(primary, vec3(1.0), 0.75);
-
+  vec3 dithered = paletteColor(level, u_levels);
   gl_FragColor = vec4(mix(fullSrc, dithered, u_intensity), 1.0);
 }
