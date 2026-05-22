@@ -309,7 +309,7 @@ const EffectInstanceBlock = memo(function EffectInstanceBlock({
 });
 
 export function EffectDevPanel() {
-	const texture = useImageStore((s) => s.texture);
+	const bitmap = useImageStore((s) => s.bitmap);
 
 	// Structural selector — re-renders only on add/remove/reorder, not param changes.
 	// String entries ("instanceId|effectId") compare by value via Object.is; object
@@ -327,7 +327,7 @@ export function EffectDevPanel() {
 		[],
 	);
 
-	if (!texture) return null;
+	if (!bitmap) return null;
 
 	return (
 		<div

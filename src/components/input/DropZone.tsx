@@ -19,9 +19,9 @@ export function DropZone({ children }: DropZoneProps) {
 	const [isDragOver, setIsDragOver] = useState(false);
 	const dragCounter = useRef(0);
 
-	const { texture, loadImage } = useImageStore(
+	const { bitmap, loadImage } = useImageStore(
 		useShallow((s) => ({
-			texture: s.texture,
+			bitmap: s.bitmap,
 			loadImage: s.loadImage,
 		})),
 	);
@@ -62,8 +62,8 @@ export function DropZone({ children }: DropZoneProps) {
 		[loadImage],
 	);
 
-	const showLanding = !texture;
-	const showOverlay = isDragOver && !!texture;
+	const showLanding = !bitmap;
+	const showOverlay = isDragOver && !!bitmap;
 
 	return (
 		// biome-ignore lint/a11y/noStaticElementInteractions: drop zone wrapper captures drag events; primary interaction is via file input buttons

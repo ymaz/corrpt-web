@@ -1,44 +1,34 @@
-import * as THREE from "three";
+import type { DrawCommand, Framebuffer2D, Texture2D } from "regl";
 
 import { renderEffectChain } from "@/effects/renderEffectChain";
 import type { EffectInstance } from "@/effects/types";
+import type { ReglContext } from "@/engine/reglContext";
 
 interface CreateEffectChainRendererOptions {
-	gl: THREE.WebGLRenderer;
-	outputMaterial: THREE.ShaderMaterial;
+	ctx: ReglContext;
 }
 
 export interface EffectChainRenderer {
-	setImage: (texture: THREE.Texture | null) => void;
+	setImage: (bitmap: ImageBitmap | null) => void;
 	setEffects: (effects: readonly EffectInstance[]) => void;
 	resize: (width: number, height: number) => void;
-	renderFrame: (time: number) => void;
+	/**
+	 * Runs the chain and returns the final output suitable for sampling.
+	 * Returns null when there's no image or the FBOs aren't sized yet.
+	 */
+	renderFrame: (time: number) => Texture2D | Framebuffer2D | null;
 	dispose: () => void;
 }
 
-function createRenderTargets(
+function createFramebufferPair(
+	ctx: ReglContext,
 	width: number,
 	height: number,
-): readonly [THREE.WebGLRenderTarget, THREE.WebGLRenderTarget] {
-	const options: THREE.RenderTargetOptions = {
-		minFilter: THREE.LinearFilter,
-		magFilter: THREE.LinearFilter,
-		format: THREE.RGBAFormat,
-		type: THREE.UnsignedByteType,
-	};
-	const a = new THREE.WebGLRenderTarget(width, height, options);
-	const b = new THREE.WebGLRenderTarget(width, height, options);
-	return [a, b] as const;
-}
-
-function createOffScreenScene() {
-	const scene = new THREE.Scene();
-	const camera = new THREE.OrthographicCamera(-0.5, 0.5, 0.5, -0.5, 0.1, 10);
-	camera.position.set(0, 0, 1);
-	const geometry = new THREE.PlaneGeometry(1, 1);
-	const mesh = new THREE.Mesh(geometry);
-	scene.add(mesh);
-	return { scene, camera, mesh, geometry };
+): readonly [Framebuffer2D, Framebuffer2D] {
+	return [
+		ctx.createFramebuffer(width, height),
+		ctx.createFramebuffer(width, height),
+	] as const;
 }
 
 function haveEffectInstanceIdsChanged(
@@ -46,81 +36,64 @@ function haveEffectInstanceIdsChanged(
 	nextEffects: readonly EffectInstance[],
 ): boolean {
 	if (currentEffects.length !== nextEffects.length) return true;
-
-	const currentIds = new Set(currentEffects.map((effect) => effect.instanceId));
-	return nextEffects.some((effect) => !currentIds.has(effect.instanceId));
+	const currentIds = new Set(currentEffects.map((e) => e.instanceId));
+	return nextEffects.some((e) => !currentIds.has(e.instanceId));
 }
 
 export function createEffectChainRenderer({
-	gl,
-	outputMaterial,
+	ctx,
 }: CreateEffectChainRendererOptions): EffectChainRenderer {
-	let texture: THREE.Texture | null = null;
+	let texture: Texture2D | null = null;
 	let effects: readonly EffectInstance[] = [];
-	let fbos: readonly [THREE.WebGLRenderTarget, THREE.WebGLRenderTarget] | null =
-		null;
+	let fbos: readonly [Framebuffer2D, Framebuffer2D] | null = null;
 	let width = 0;
 	let height = 0;
 	let disposed = false;
 
-	const offScreen = createOffScreenScene();
-	const materialCache = new Map<string, THREE.ShaderMaterial>();
-	const resolution = new THREE.Vector2(width, height);
+	const commandCache = new Map<string, DrawCommand>();
 
-	const setOutputTexture = (nextTexture: THREE.Texture | null) => {
-		const uniform = outputMaterial.uniforms.u_texture;
-		if (uniform) {
-			uniform.value = nextTexture;
-		}
-	};
-
-	const syncOutputResolution = () => {
-		const uniform = outputMaterial.uniforms.u_resolution;
-		if (uniform?.value instanceof THREE.Vector2) {
-			uniform.value.copy(resolution);
-		}
-	};
-
-	const disposeRenderTargets = () => {
+	const disposeFramebuffers = () => {
 		if (!fbos) return;
-		fbos[0].dispose();
-		fbos[1].dispose();
+		fbos[0].destroy();
+		fbos[1].destroy();
 		fbos = null;
 	};
 
-	const disposeInactiveMaterials = () => {
-		const activeSet = new Set(effects.map((effect) => effect.instanceId));
-		const inactiveIds: string[] = [];
+	const disposeTexture = () => {
+		if (!texture) return;
+		texture.destroy();
+		texture = null;
+	};
 
-		for (const [id, material] of materialCache) {
+	// regl DrawCommands have no public destroy method — their shader programs
+	// are cached by the regl context and released only when the context itself
+	// is destroyed. Since all instances of a given effectId share the same
+	// shader source, regl reuses the same program across them, so the practical
+	// memory cost of orphaned commands is bounded by the number of distinct
+	// effect definitions, not the number of instances created over a session.
+	const evictInactiveCommands = () => {
+		const activeSet = new Set(effects.map((e) => e.instanceId));
+		for (const id of commandCache.keys()) {
 			if (!activeSet.has(id)) {
-				material.dispose();
-				inactiveIds.push(id);
+				commandCache.delete(id);
 			}
-		}
-
-		for (const id of inactiveIds) {
-			materialCache.delete(id);
 		}
 	};
 
 	return {
-		setImage(nextTexture) {
+		setImage(bitmap) {
 			if (disposed) return;
-			texture = nextTexture;
-			setOutputTexture(nextTexture);
+			disposeTexture();
+			texture = bitmap ? ctx.createImageTexture(bitmap) : null;
 		},
 
 		setEffects(nextEffects) {
 			if (disposed) return;
 			if (nextEffects === effects) return;
-			const instanceIdsChanged = haveEffectInstanceIdsChanged(
-				effects,
-				nextEffects,
-			);
+			const idsChanged = haveEffectInstanceIdsChanged(effects, nextEffects);
 			effects = nextEffects;
-			if (instanceIdsChanged) {
-				disposeInactiveMaterials();
+			if (idsChanged) {
+				evictInactiveCommands();
 			}
 		},
 
@@ -130,50 +103,40 @@ export function createEffectChainRenderer({
 
 			width = nextWidth;
 			height = nextHeight;
-			resolution.set(width, height);
-			syncOutputResolution();
 
-			disposeRenderTargets();
-			fbos = createRenderTargets(width, height);
+			disposeFramebuffers();
+			fbos = createFramebufferPair(ctx, width, height);
 		},
 
 		renderFrame(time) {
-			if (disposed || !texture) return;
-			if (width === 0 || height === 0) return;
+			if (disposed || !texture) return null;
+			if (width === 0 || height === 0) return null;
 
 			if (effects.length === 0) {
-				setOutputTexture(texture);
-				return;
+				return texture;
 			}
 
 			if (!fbos) {
-				fbos = createRenderTargets(width, height);
+				fbos = createFramebufferPair(ctx, width, height);
 			}
 
-			const outputTexture = renderEffectChain({
-				gl,
+			return renderEffectChain({
+				ctx,
 				texture,
 				effects,
 				fbos,
-				offScreen,
-				materialCache,
-				resolution,
+				commandCache,
+				resolution: [width, height],
 				time,
 			});
-
-			setOutputTexture(outputTexture);
 		},
 
 		dispose() {
 			if (disposed) return;
 			disposed = true;
-
-			disposeRenderTargets();
-			for (const material of materialCache.values()) {
-				material.dispose();
-			}
-			materialCache.clear();
-			offScreen.geometry.dispose();
+			disposeFramebuffers();
+			disposeTexture();
+			commandCache.clear();
 		},
 	};
 }

@@ -1,8 +1,9 @@
-import * as THREE from "three";
+import type { DrawCommand, Framebuffer2D, Texture2D } from "regl";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { registerEffect } from "@/effects/registry";
 import type { EffectDefinition, EffectInstance } from "@/effects/types";
+import type { ReglContext } from "@/engine/reglContext";
 import { createEffectChainRenderer } from "../createEffectChainRenderer";
 
 const TEST_EFFECT_ID = "cecr-test-effect";
@@ -37,27 +38,68 @@ function makeInstance(overrides?: Partial<EffectInstance>): EffectInstance {
 	};
 }
 
-function makeOutputMaterial() {
-	return {
-		uniforms: {
-			u_texture: { value: null as THREE.Texture | null },
-			u_resolution: { value: new THREE.Vector2() },
+function makeFakeBitmap(): ImageBitmap {
+	return {} as ImageBitmap;
+}
+
+interface FakeContext {
+	ctx: ReglContext;
+	createFramebuffer: ReturnType<typeof vi.fn>;
+	createImageTexture: ReturnType<typeof vi.fn>;
+	createPassCommand: ReturnType<typeof vi.fn>;
+	drawCalls: Array<{
+		framebuffer: Framebuffer2D;
+		props: Record<string, unknown>;
+	}>;
+	textureDestroySpy: ReturnType<typeof vi.fn>;
+	framebufferDestroySpies: Array<ReturnType<typeof vi.fn>>;
+}
+
+function makeFakeContext(): FakeContext {
+	const drawCalls: FakeContext["drawCalls"] = [];
+	const framebufferDestroySpies: FakeContext["framebufferDestroySpies"] = [];
+	const textureDestroySpy = vi.fn();
+
+	const createFramebuffer = vi.fn(
+		(width: number, height: number): Framebuffer2D => {
+			const destroy = vi.fn();
+			framebufferDestroySpies.push(destroy);
+			return { width, height, destroy } as unknown as Framebuffer2D;
 		},
-	} as unknown as THREE.ShaderMaterial;
-}
+	);
 
-function makeGl() {
+	const createImageTexture = vi.fn(
+		(_bitmap: ImageBitmap): Texture2D =>
+			({ destroy: textureDestroySpy }) as unknown as Texture2D,
+	);
+
+	const createPassCommand = vi.fn((): DrawCommand => {
+		return vi.fn((props: Record<string, unknown>) => {
+			const { framebuffer, ...rest } = props;
+			drawCalls.push({
+				framebuffer: framebuffer as Framebuffer2D,
+				props: rest,
+			});
+		}) as unknown as DrawCommand;
+	});
+
+	const ctx = {
+		regl: { prop: (n: string) => n },
+		createFramebuffer,
+		createImageTexture,
+		createPassCommand,
+		destroy: vi.fn(),
+	} as unknown as ReglContext;
+
 	return {
-		setRenderTarget: vi.fn(),
-		render: vi.fn(),
-	} as unknown as THREE.WebGLRenderer;
-}
-
-function setup() {
-	const gl = makeGl();
-	const outputMaterial = makeOutputMaterial();
-	const renderer = createEffectChainRenderer({ gl, outputMaterial });
-	return { gl, outputMaterial, renderer };
+		ctx,
+		createFramebuffer,
+		createImageTexture,
+		createPassCommand,
+		drawCalls,
+		textureDestroySpy,
+		framebufferDestroySpies,
+	};
 }
 
 afterEach(() => {
@@ -66,219 +108,244 @@ afterEach(() => {
 
 describe("createEffectChainRenderer", () => {
 	describe("setImage", () => {
-		it("sets u_texture on outputMaterial", () => {
-			const { renderer, outputMaterial } = setup();
-			const tex = {} as THREE.Texture;
-			renderer.setImage(tex);
-			expect(outputMaterial.uniforms.u_texture.value).toBe(tex);
+		it("creates a regl texture from the bitmap", () => {
+			const fake = makeFakeContext();
+			const renderer = createEffectChainRenderer({ ctx: fake.ctx });
+			const bitmap = makeFakeBitmap();
+			renderer.setImage(bitmap);
+			expect(fake.createImageTexture).toHaveBeenCalledWith(bitmap);
+		});
+
+		it("destroys the previous texture when a new bitmap is set", () => {
+			const fake = makeFakeContext();
+			const renderer = createEffectChainRenderer({ ctx: fake.ctx });
+			renderer.setImage(makeFakeBitmap());
+			expect(fake.textureDestroySpy).not.toHaveBeenCalled();
+			renderer.setImage(makeFakeBitmap());
+			expect(fake.textureDestroySpy).toHaveBeenCalledOnce();
+		});
+
+		it("destroys the texture when bitmap is null", () => {
+			const fake = makeFakeContext();
+			const renderer = createEffectChainRenderer({ ctx: fake.ctx });
+			renderer.setImage(makeFakeBitmap());
+			renderer.setImage(null);
+			expect(fake.textureDestroySpy).toHaveBeenCalledOnce();
 		});
 
 		it("is a no-op after dispose", () => {
-			const { renderer, outputMaterial } = setup();
+			const fake = makeFakeContext();
+			const renderer = createEffectChainRenderer({ ctx: fake.ctx });
 			renderer.dispose();
-			renderer.setImage({} as THREE.Texture);
-			expect(outputMaterial.uniforms.u_texture.value).toBeNull();
+			fake.createImageTexture.mockClear();
+			renderer.setImage(makeFakeBitmap());
+			expect(fake.createImageTexture).not.toHaveBeenCalled();
 		});
 	});
 
 	describe("resize", () => {
-		it("updates u_resolution on outputMaterial", () => {
-			const { renderer, outputMaterial } = setup();
+		it("creates a pair of framebuffers at the requested size", () => {
+			const fake = makeFakeContext();
+			const renderer = createEffectChainRenderer({ ctx: fake.ctx });
 			renderer.resize(800, 600);
-			expect(outputMaterial.uniforms.u_resolution.value.x).toBe(800);
-			expect(outputMaterial.uniforms.u_resolution.value.y).toBe(600);
+			expect(fake.createFramebuffer).toHaveBeenCalledTimes(2);
+			expect(fake.createFramebuffer).toHaveBeenCalledWith(800, 600);
 		});
 
-		it("does not dispose FBOs when called again with the same dimensions", () => {
-			const disposeSpy = vi.spyOn(THREE.WebGLRenderTarget.prototype, "dispose");
-			const { renderer } = setup();
+		it("does not recreate framebuffers when called again with the same dimensions", () => {
+			const fake = makeFakeContext();
+			const renderer = createEffectChainRenderer({ ctx: fake.ctx });
 			renderer.resize(100, 100);
-			disposeSpy.mockClear();
+			fake.createFramebuffer.mockClear();
 			renderer.resize(100, 100);
-			expect(disposeSpy).not.toHaveBeenCalled();
+			expect(fake.createFramebuffer).not.toHaveBeenCalled();
 		});
 
-		it("disposes old FBOs when dimensions change", () => {
-			const disposeSpy = vi.spyOn(THREE.WebGLRenderTarget.prototype, "dispose");
-			const { renderer } = setup();
+		it("destroys old framebuffers when dimensions change", () => {
+			const fake = makeFakeContext();
+			const renderer = createEffectChainRenderer({ ctx: fake.ctx });
 			renderer.resize(100, 100);
-			disposeSpy.mockClear();
+			const [destroyA, destroyB] = fake.framebufferDestroySpies;
 			renderer.resize(200, 200);
-			expect(disposeSpy).toHaveBeenCalledTimes(2);
+			expect(destroyA).toHaveBeenCalledOnce();
+			expect(destroyB).toHaveBeenCalledOnce();
 		});
 	});
 
 	describe("renderFrame", () => {
-		it("is a no-op when no texture is set", () => {
-			const { renderer, gl } = setup();
+		it("returns null when no texture is set", () => {
+			const fake = makeFakeContext();
+			const renderer = createEffectChainRenderer({ ctx: fake.ctx });
 			renderer.resize(100, 100);
-			renderer.renderFrame(0);
-			expect(gl.render).not.toHaveBeenCalled();
+			expect(renderer.renderFrame(0)).toBeNull();
 		});
 
-		it("is a no-op before resize (width/height still 0)", () => {
-			const { renderer, gl } = setup();
-			renderer.setImage({} as THREE.Texture);
-			renderer.renderFrame(0);
-			expect(gl.render).not.toHaveBeenCalled();
+		it("returns null before resize (width/height still 0)", () => {
+			const fake = makeFakeContext();
+			const renderer = createEffectChainRenderer({ ctx: fake.ctx });
+			renderer.setImage(makeFakeBitmap());
+			expect(renderer.renderFrame(0)).toBeNull();
 		});
 
-		it("does not call gl.render when effects list is empty", () => {
-			const { renderer, gl } = setup();
-			renderer.setImage({} as THREE.Texture);
-			renderer.resize(100, 100);
-			renderer.setEffects([]);
-			renderer.renderFrame(0);
-			expect(gl.render).not.toHaveBeenCalled();
-		});
-
-		it("sets u_texture to original texture when effects list is empty", () => {
-			const { renderer, outputMaterial } = setup();
-			const tex = {} as THREE.Texture;
-			renderer.setImage(tex);
+		it("does not invoke any draw command when effects list is empty", () => {
+			const fake = makeFakeContext();
+			const renderer = createEffectChainRenderer({ ctx: fake.ctx });
+			renderer.setImage(makeFakeBitmap());
 			renderer.resize(100, 100);
 			renderer.setEffects([]);
 			renderer.renderFrame(0);
-			expect(outputMaterial.uniforms.u_texture.value).toBe(tex);
+			expect(fake.drawCalls).toHaveLength(0);
 		});
 
-		it("calls gl.render once per enabled effect", () => {
-			const { renderer, gl } = setup();
-			renderer.setImage({} as THREE.Texture);
+		it("returns the input texture when effects list is empty", () => {
+			const fake = makeFakeContext();
+			const renderer = createEffectChainRenderer({ ctx: fake.ctx });
+			renderer.setImage(makeFakeBitmap());
+			renderer.resize(100, 100);
+			renderer.setEffects([]);
+			expect(renderer.renderFrame(0)).toBeTruthy();
+		});
+
+		it("invokes the draw command once per enabled effect", () => {
+			const fake = makeFakeContext();
+			const renderer = createEffectChainRenderer({ ctx: fake.ctx });
+			renderer.setImage(makeFakeBitmap());
 			renderer.resize(100, 100);
 			renderer.setEffects([
 				makeInstance({ instanceId: "cecr-r1" }),
 				makeInstance({ instanceId: "cecr-r2" }),
 			]);
 			renderer.renderFrame(0);
-			expect(gl.render).toHaveBeenCalledTimes(2);
+			expect(fake.drawCalls).toHaveLength(2);
 		});
 
-		it("is a no-op after dispose", () => {
-			const { renderer, gl } = setup();
-			renderer.setImage({} as THREE.Texture);
+		it("returns null after dispose", () => {
+			const fake = makeFakeContext();
+			const renderer = createEffectChainRenderer({ ctx: fake.ctx });
+			renderer.setImage(makeFakeBitmap());
 			renderer.resize(100, 100);
 			renderer.setEffects([makeInstance()]);
 			renderer.dispose();
-			renderer.renderFrame(0);
-			expect(gl.render).not.toHaveBeenCalled();
+			expect(renderer.renderFrame(0)).toBeNull();
 		});
 	});
 
 	describe("setEffects", () => {
 		it("is a no-op when called with the same array reference", () => {
-			const disposeSpy = vi.spyOn(THREE.ShaderMaterial.prototype, "dispose");
-			const { renderer } = setup();
-			renderer.setImage({} as THREE.Texture);
+			const fake = makeFakeContext();
+			const renderer = createEffectChainRenderer({ ctx: fake.ctx });
+			renderer.setImage(makeFakeBitmap());
 			renderer.resize(100, 100);
 			const effects = [makeInstance({ instanceId: "cecr-same-ref" })];
 			renderer.setEffects(effects);
 			renderer.renderFrame(0);
-			disposeSpy.mockClear();
+			fake.createPassCommand.mockClear();
 			renderer.setEffects(effects);
-			expect(disposeSpy).not.toHaveBeenCalled();
+			renderer.renderFrame(0);
+			// Cached command reused — no new command compiled
+			expect(fake.createPassCommand).not.toHaveBeenCalled();
 		});
 
-		it("disposes material for a removed effect", () => {
-			const disposeSpy = vi.spyOn(THREE.ShaderMaterial.prototype, "dispose");
-			const { renderer } = setup();
-			renderer.setImage({} as THREE.Texture);
+		it("evicts cached command for a removed effect", () => {
+			const fake = makeFakeContext();
+			const renderer = createEffectChainRenderer({ ctx: fake.ctx });
+			renderer.setImage(makeFakeBitmap());
 			renderer.resize(100, 100);
 			renderer.setEffects([
 				makeInstance({ instanceId: "cecr-evict-a" }),
 				makeInstance({ instanceId: "cecr-evict-b" }),
 			]);
 			renderer.renderFrame(0);
-			disposeSpy.mockClear();
+			expect(fake.createPassCommand).toHaveBeenCalledTimes(2);
 			renderer.setEffects([makeInstance({ instanceId: "cecr-evict-b" })]);
-			expect(disposeSpy).toHaveBeenCalledTimes(1);
+			renderer.renderFrame(0);
+			// Only "cecr-evict-b" remains in the cache; if "cecr-evict-a" had been
+			// retained, no new command would be compiled. We rerun the chain after
+			// re-adding "cecr-evict-a" and assert a fresh compile to prove it was
+			// evicted.
+			fake.createPassCommand.mockClear();
+			renderer.setEffects([
+				makeInstance({ instanceId: "cecr-evict-a" }),
+				makeInstance({ instanceId: "cecr-evict-b" }),
+			]);
+			renderer.renderFrame(0);
+			expect(fake.createPassCommand).toHaveBeenCalledTimes(1);
 		});
 
-		it("does not dispose materials when instance IDs are unchanged", () => {
-			const disposeSpy = vi.spyOn(THREE.ShaderMaterial.prototype, "dispose");
-			const { renderer } = setup();
-			renderer.setImage({} as THREE.Texture);
+		it("does not evict commands when instance IDs are unchanged", () => {
+			const fake = makeFakeContext();
+			const renderer = createEffectChainRenderer({ ctx: fake.ctx });
+			renderer.setImage(makeFakeBitmap());
 			renderer.resize(100, 100);
 			renderer.setEffects([makeInstance({ instanceId: "cecr-keep-a" })]);
 			renderer.renderFrame(0);
-			disposeSpy.mockClear();
+			fake.createPassCommand.mockClear();
 			renderer.setEffects([
 				makeInstance({
 					instanceId: "cecr-keep-a",
 					parameters: { amount: 0.9 },
 				}),
 			]);
-			expect(disposeSpy).not.toHaveBeenCalled();
+			renderer.renderFrame(0);
+			expect(fake.createPassCommand).not.toHaveBeenCalled();
 		});
 
-		it("disposes replaced effect when same-length swap occurs", () => {
-			// Exercises the nextEffects.some(id not in set) branch of haveEffectInstanceIdsChanged,
-			// which is unreachable via a length-change alone.
-			const disposeSpy = vi.spyOn(THREE.ShaderMaterial.prototype, "dispose");
-			const { renderer } = setup();
-			renderer.setImage({} as THREE.Texture);
+		it("evicts replaced effect when same-length swap occurs", () => {
+			const fake = makeFakeContext();
+			const renderer = createEffectChainRenderer({ ctx: fake.ctx });
+			renderer.setImage(makeFakeBitmap());
 			renderer.resize(100, 100);
 			renderer.setEffects([
 				makeInstance({ instanceId: "cecr-swap-a" }),
 				makeInstance({ instanceId: "cecr-swap-b" }),
 			]);
 			renderer.renderFrame(0);
-			disposeSpy.mockClear();
+			fake.createPassCommand.mockClear();
 			renderer.setEffects([
 				makeInstance({ instanceId: "cecr-swap-a" }),
 				makeInstance({ instanceId: "cecr-swap-c" }),
 			]);
-			expect(disposeSpy).toHaveBeenCalledTimes(1);
+			renderer.renderFrame(0);
+			// "cecr-swap-c" is new → 1 compile.
+			expect(fake.createPassCommand).toHaveBeenCalledTimes(1);
 		});
 
 		it("is a no-op after dispose", () => {
-			const disposeSpy = vi.spyOn(THREE.ShaderMaterial.prototype, "dispose");
-			const { renderer } = setup();
-			renderer.setImage({} as THREE.Texture);
+			const fake = makeFakeContext();
+			const renderer = createEffectChainRenderer({ ctx: fake.ctx });
+			renderer.setImage(makeFakeBitmap());
 			renderer.resize(100, 100);
 			renderer.setEffects([makeInstance({ instanceId: "cecr-postdisp-a" })]);
 			renderer.renderFrame(0);
 			renderer.dispose();
-			disposeSpy.mockClear();
+			fake.createPassCommand.mockClear();
 			renderer.setEffects([makeInstance({ instanceId: "cecr-postdisp-b" })]);
-			expect(disposeSpy).not.toHaveBeenCalled();
+			expect(fake.createPassCommand).not.toHaveBeenCalled();
 		});
 	});
 
 	describe("dispose", () => {
-		it("disposes both FBOs created during resize", () => {
-			const disposeSpy = vi.spyOn(THREE.WebGLRenderTarget.prototype, "dispose");
-			const { renderer } = setup();
+		it("destroys both framebuffers created during resize", () => {
+			const fake = makeFakeContext();
+			const renderer = createEffectChainRenderer({ ctx: fake.ctx });
 			renderer.resize(100, 100);
-			disposeSpy.mockClear();
+			const [destroyA, destroyB] = fake.framebufferDestroySpies;
 			renderer.dispose();
-			expect(disposeSpy).toHaveBeenCalledTimes(2);
+			expect(destroyA).toHaveBeenCalledOnce();
+			expect(destroyB).toHaveBeenCalledOnce();
 		});
 
-		it("disposes all cached materials", () => {
-			const disposeSpy = vi.spyOn(THREE.ShaderMaterial.prototype, "dispose");
-			const { renderer } = setup();
-			renderer.setImage({} as THREE.Texture);
-			renderer.resize(100, 100);
-			renderer.setEffects([
-				makeInstance({ instanceId: "cecr-disp-a" }),
-				makeInstance({ instanceId: "cecr-disp-b" }),
-			]);
-			renderer.renderFrame(0);
-			disposeSpy.mockClear();
+		it("destroys the image texture", () => {
+			const fake = makeFakeContext();
+			const renderer = createEffectChainRenderer({ ctx: fake.ctx });
+			renderer.setImage(makeFakeBitmap());
 			renderer.dispose();
-			expect(disposeSpy).toHaveBeenCalledTimes(2);
-		});
-
-		it("disposes the offscreen geometry", () => {
-			const disposeSpy = vi.spyOn(THREE.BufferGeometry.prototype, "dispose");
-			const { renderer } = setup();
-			renderer.dispose();
-			expect(disposeSpy).toHaveBeenCalled();
+			expect(fake.textureDestroySpy).toHaveBeenCalledOnce();
 		});
 
 		it("is idempotent: calling dispose twice does not throw", () => {
-			const { renderer } = setup();
+			const fake = makeFakeContext();
+			const renderer = createEffectChainRenderer({ ctx: fake.ctx });
 			renderer.resize(100, 100);
 			expect(() => {
 				renderer.dispose();
@@ -288,13 +355,13 @@ describe("createEffectChainRenderer", () => {
 	});
 
 	describe("resize after dispose", () => {
-		it("is a no-op: does not create new FBOs", () => {
-			const disposeSpy = vi.spyOn(THREE.WebGLRenderTarget.prototype, "dispose");
-			const { renderer } = setup();
+		it("is a no-op: does not create new framebuffers", () => {
+			const fake = makeFakeContext();
+			const renderer = createEffectChainRenderer({ ctx: fake.ctx });
 			renderer.dispose();
-			disposeSpy.mockClear();
+			fake.createFramebuffer.mockClear();
 			renderer.resize(100, 100);
-			expect(disposeSpy).not.toHaveBeenCalled();
+			expect(fake.createFramebuffer).not.toHaveBeenCalled();
 		});
 	});
 });

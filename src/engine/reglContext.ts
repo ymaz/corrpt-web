@@ -64,10 +64,15 @@ export function createReglContext(
 
 	const positionBuffer = regl.buffer(FULLSCREEN_QUAD as unknown as number[][]);
 
+	// three.js auto-prepends a precision qualifier to every shader; regl does
+	// not. Without one, fragment shaders fail to compile on most drivers.
+	// `highp` matches three's default and is universally supported on WebGL1.
+	const FRAGMENT_PRECISION = "precision highp float;\n";
+
 	function createPassCommand(opts: PassCommandOptions): DrawCommand {
 		return regl({
 			vert: opts.vertexShader,
-			frag: opts.fragmentShader,
+			frag: FRAGMENT_PRECISION + opts.fragmentShader,
 			attributes: { a_position: positionBuffer },
 			uniforms: opts.uniforms,
 			primitive: "triangle strip",

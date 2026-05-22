@@ -1,4 +1,3 @@
-import * as THREE from "three";
 import { create } from "zustand";
 
 import {
@@ -13,7 +12,7 @@ let loadGeneration = 0;
 let currentBitmap: ImageBitmap | null = null;
 
 export const useImageStore = create<ImageStore>((set, get) => ({
-	texture: null,
+	bitmap: null,
 	dimensions: null,
 	originalUrl: null,
 	fileName: null,
@@ -23,10 +22,7 @@ export const useImageStore = create<ImageStore>((set, get) => ({
 	warning: null,
 
 	clearImage: () => {
-		const { texture, originalUrl } = get();
-		if (texture) {
-			texture.dispose();
-		}
+		const { originalUrl } = get();
 		if (currentBitmap) {
 			currentBitmap.close();
 			currentBitmap = null;
@@ -35,7 +31,7 @@ export const useImageStore = create<ImageStore>((set, get) => ({
 			URL.revokeObjectURL(originalUrl);
 		}
 		set({
-			texture: null,
+			bitmap: null,
 			dimensions: null,
 			originalUrl: null,
 			fileName: null,
@@ -119,9 +115,10 @@ export const useImageStore = create<ImageStore>((set, get) => ({
 					return;
 				}
 
-				// Three.js r152+ skips UNPACK_FLIP_Y_WEBGL for ImageBitmap sources,
-				// so tex.flipY has no effect. Pre-flip the bitmap for WebGL's
-				// bottom-left origin so UV (0,0) reads the bottom of the image.
+				// Pre-flip the bitmap for WebGL's bottom-left origin so UV (0,0)
+				// reads the bottom of the image. Modern browsers skip
+				// UNPACK_FLIP_Y_WEBGL for ImageBitmap sources, so flipping at
+				// upload time is unreliable — we bake it into the bitmap itself.
 				const finalBitmap = await createImageBitmap(scaledBitmap, {
 					imageOrientation: "flipY",
 				});
@@ -134,15 +131,9 @@ export const useImageStore = create<ImageStore>((set, get) => ({
 				}
 
 				currentBitmap = finalBitmap;
-				const tex = new THREE.Texture(finalBitmap);
-				tex.needsUpdate = true;
-				tex.colorSpace = THREE.NoColorSpace;
-				tex.flipY = false;
-				tex.minFilter = THREE.LinearFilter;
-				tex.magFilter = THREE.LinearFilter;
 
 				set({
-					texture: tex,
+					bitmap: finalBitmap,
 					dimensions: { width: finalBitmap.width, height: finalBitmap.height },
 					originalUrl: objectUrl,
 					fileName: baseName,

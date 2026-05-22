@@ -1,5 +1,3 @@
-import type * as THREE from "three";
-
 import type { EffectInstance, EffectParameterValue } from "@/effects/types";
 
 // Shared type aliases
@@ -14,7 +12,7 @@ interface ImageDimensions {
 
 // Image store
 interface ImageState {
-	texture: THREE.Texture | null;
+	bitmap: ImageBitmap | null;
 	dimensions: ImageDimensions | null;
 	originalUrl: string | null;
 	fileName: string | null;
