@@ -94,7 +94,6 @@ function EffectCanvasInner({ className }: EffectCanvasProps) {
 			const output = renderer.renderFrame(time);
 			const fv = fittedViewportRef.current;
 
-			// Paint background — matches the original `<color attach="background">`.
 			ctx.regl.clear({ color: [0.102, 0.102, 0.102, 1], depth: 1 });
 
 			if (output && fv.width > 0 && fv.height > 0) {
@@ -108,7 +107,6 @@ function EffectCanvasInner({ className }: EffectCanvasProps) {
 		});
 	}, []);
 
-	// One-shot: create the regl context, renderer, and blit command.
 	useEffect(() => {
 		const canvas = canvasRef.current;
 		if (!canvas) return;
@@ -138,7 +136,6 @@ function EffectCanvasInner({ className }: EffectCanvasProps) {
 		rendererRef.current = renderer;
 		blitRef.current = blit;
 
-		// Seed renderer state with whatever is in the stores right now.
 		const imageState = useImageStore.getState();
 		const effectState = useEffectStore.getState();
 		renderer.setImage(imageState.bitmap);
@@ -158,9 +155,6 @@ function EffectCanvasInner({ className }: EffectCanvasProps) {
 		};
 	}, [invalidate]);
 
-	// Resize canvas backing store and FBOs whenever the image or container
-	// changes. ResizeObserver fires for layout, and the image effect picks up
-	// bitmap swaps; both funnel through a single sync function.
 	useEffect(() => {
 		const canvas = canvasRef.current;
 		if (!canvas) return;
@@ -204,8 +198,6 @@ function EffectCanvasInner({ className }: EffectCanvasProps) {
 		const ro = new ResizeObserver(sync);
 		ro.observe(canvas);
 
-		// Image store changes (new bitmap / cleared) drive both texture upload
-		// and viewport recompute.
 		const unsubImage = useImageStore.subscribe((state, prev) => {
 			if (state.bitmap !== prev.bitmap) {
 				rendererRef.current?.setImage(state.bitmap);

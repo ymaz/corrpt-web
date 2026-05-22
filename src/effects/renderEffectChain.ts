@@ -14,7 +14,6 @@ export interface RenderChainParams {
 	time: number;
 }
 
-// Keyed by effectId; built once per definition, never rebuilt.
 const enumMapCache = new Map<string, Map<string, Map<string, number>>>();
 
 function getEnumMaps(def: EffectDefinition): Map<string, Map<string, number>> {
@@ -54,14 +53,7 @@ function buildCommand(ctx: ReglContext, def: EffectDefinition): DrawCommand {
 	});
 }
 
-/**
- * Runs the multi-pass FBO effect chain and returns the final output.
- * Pure rendering function — callable from preview and export paths.
- *
- * Note: when no effects run, returns the input Texture2D; otherwise the
- * final Framebuffer2D. Both are valid sampler2D inputs in regl, so the
- * caller can blit either uniformly.
- */
+/** Returns the input Texture2D if no effects ran, else the last Framebuffer2D. */
 export function renderEffectChain(
 	params: RenderChainParams,
 ): Texture2D | Framebuffer2D {

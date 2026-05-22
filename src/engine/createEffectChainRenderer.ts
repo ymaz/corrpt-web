@@ -12,10 +12,7 @@ export interface EffectChainRenderer {
 	setImage: (bitmap: ImageBitmap | null) => void;
 	setEffects: (effects: readonly EffectInstance[]) => void;
 	resize: (width: number, height: number) => void;
-	/**
-	 * Runs the chain and returns the final output suitable for sampling.
-	 * Returns null when there's no image or the FBOs aren't sized yet.
-	 */
+	/** null when there's no image or the FBOs aren't sized yet. */
 	renderFrame: (time: number) => Texture2D | Framebuffer2D | null;
 	dispose: () => void;
 }
@@ -65,12 +62,8 @@ export function createEffectChainRenderer({
 		texture = null;
 	};
 
-	// regl DrawCommands have no public destroy method — their shader programs
-	// are cached by the regl context and released only when the context itself
-	// is destroyed. Since all instances of a given effectId share the same
-	// shader source, regl reuses the same program across them, so the practical
-	// memory cost of orphaned commands is bounded by the number of distinct
-	// effect definitions, not the number of instances created over a session.
+	// regl has no DrawCommand.destroy; programs are reclaimed only with the
+	// context. Bounded by effect-definition count, so the leak is finite.
 	const evictInactiveCommands = () => {
 		const activeSet = new Set(effects.map((e) => e.instanceId));
 		for (const id of commandCache.keys()) {

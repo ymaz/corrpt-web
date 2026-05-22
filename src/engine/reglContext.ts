@@ -5,11 +5,11 @@ import createREGL, {
 	type Texture2D,
 } from "regl";
 
-export interface PassUniforms {
+interface PassUniforms {
 	[name: string]: unknown;
 }
 
-export interface PassCommandOptions {
+interface PassCommandOptions {
 	vertexShader: string;
 	fragmentShader: string;
 	uniforms: PassUniforms;
@@ -23,25 +23,11 @@ export interface ReglContext {
 	destroy(): void;
 }
 
-export interface CreateReglContextOptions {
+interface CreateReglContextOptions {
 	preserveDrawingBuffer?: boolean;
 }
 
-// Match three.js WebGLRenderer defaults so the swap is observably identical:
-// - premultipliedAlpha: true (three's default) — final canvas composites against the page
-//   as premultiplied; we match so background blending stays identical.
-// - antialias: false — orthographic full-screen quads, no need.
-// - powerPreference: "high-performance" — discrete GPU on laptops.
-const BASE_CONTEXT_ATTRS: WebGLContextAttributes = {
-	alpha: true,
-	antialias: false,
-	premultipliedAlpha: true,
-	powerPreference: "high-performance",
-};
-
-// Full-screen quad as a triangle strip in clip space.
-// The vertex shader maps [-1,1] → [0,1] UVs so any pass can sample without setup.
-const FULLSCREEN_QUAD: ReadonlyArray<readonly [number, number]> = [
+const FULLSCREEN_QUAD: number[][] = [
 	[-1, -1],
 	[1, -1],
 	[-1, 1],
@@ -55,18 +41,20 @@ export function createReglContext(
 	const regl = createREGL({
 		canvas,
 		attributes: {
-			...BASE_CONTEXT_ATTRS,
-			// Required when reading pixels via canvas.toBlob() (export path):
-			// WebGL may clear the drawing buffer after compositing.
+			alpha: true,
+			antialias: false,
+			// Page compositing assumes premultiplied output.
+			premultipliedAlpha: true,
+			powerPreference: "high-performance",
+			// Required for the export path: canvas.toBlob is async and reads
+			// the drawing buffer after the frame, which may otherwise be cleared.
 			preserveDrawingBuffer: options.preserveDrawingBuffer ?? false,
 		},
 	});
 
-	const positionBuffer = regl.buffer(FULLSCREEN_QUAD as unknown as number[][]);
+	const positionBuffer = regl.buffer(FULLSCREEN_QUAD);
 
-	// three.js auto-prepends a precision qualifier to every shader; regl does
-	// not. Without one, fragment shaders fail to compile on most drivers.
-	// `highp` matches three's default and is universally supported on WebGL1.
+	// Required: regl, unlike three, does not inject a precision qualifier.
 	const FRAGMENT_PRECISION = "precision highp float;\n";
 
 	function createPassCommand(opts: PassCommandOptions): DrawCommand {
@@ -82,13 +70,10 @@ export function createReglContext(
 	}
 
 	function createImageTexture(bitmap: ImageBitmap): Texture2D {
-		// regl 2.1.1 supports ImageBitmap at runtime (lib/texture.js BITMAP_CLASS)
-		// but its TypeScript types only list HTMLImageElement etc. — hence the cast.
-		// The bitmap is pre-flipped at upload time (imageStore.ts: createImageBitmap
-		// with imageOrientation "flipY") to match WebGL's bottom-left UV origin, so
-		// we set flipY: false to avoid a second flip. premultiplyAlpha: false
-		// because source images are always opaque (JPEG/PNG/WebP) — leaving alpha
-		// untouched keeps intermediate FBO math identical to the three.js pipeline.
+		// regl supports ImageBitmap at runtime, but its types only list
+		// HTMLImageElement etc. — hence the cast.
+		// flipY: false because the bitmap is pre-flipped at decode time
+		// (imageStore.ts) to match WebGL's bottom-left UV origin.
 		return regl.texture({
 			data: bitmap as unknown as HTMLImageElement,
 			format: "rgba",
