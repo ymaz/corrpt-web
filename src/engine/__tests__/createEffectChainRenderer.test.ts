@@ -46,7 +46,7 @@ interface FakeContext {
 	ctx: ReglContext;
 	createFramebuffer: ReturnType<typeof vi.fn>;
 	createImageTexture: ReturnType<typeof vi.fn>;
-	createPassCommand: ReturnType<typeof vi.fn>;
+	createEffectCommand: ReturnType<typeof vi.fn>;
 	drawCalls: Array<{
 		framebuffer: Framebuffer2D;
 		props: Record<string, unknown>;
@@ -73,7 +73,7 @@ function makeFakeContext(): FakeContext {
 			({ destroy: textureDestroySpy }) as unknown as Texture2D,
 	);
 
-	const createPassCommand = vi.fn((): DrawCommand => {
+	const createEffectCommand = vi.fn((): DrawCommand => {
 		return vi.fn((props: Record<string, unknown>) => {
 			const { framebuffer, ...rest } = props;
 			drawCalls.push({
@@ -87,7 +87,7 @@ function makeFakeContext(): FakeContext {
 		regl: { prop: (n: string) => n },
 		createFramebuffer,
 		createImageTexture,
-		createPassCommand,
+		createEffectCommand,
 		destroy: vi.fn(),
 	} as unknown as ReglContext;
 
@@ -95,7 +95,7 @@ function makeFakeContext(): FakeContext {
 		ctx,
 		createFramebuffer,
 		createImageTexture,
-		createPassCommand,
+		createEffectCommand,
 		drawCalls,
 		textureDestroySpy,
 		framebufferDestroySpies,
@@ -239,11 +239,11 @@ describe("createEffectChainRenderer", () => {
 			const effects = [makeInstance({ instanceId: "cecr-same-ref" })];
 			renderer.setEffects(effects);
 			renderer.renderFrame(0);
-			fake.createPassCommand.mockClear();
+			fake.createEffectCommand.mockClear();
 			renderer.setEffects(effects);
 			renderer.renderFrame(0);
 			// Cached command reused — no new command compiled
-			expect(fake.createPassCommand).not.toHaveBeenCalled();
+			expect(fake.createEffectCommand).not.toHaveBeenCalled();
 		});
 
 		it("evicts cached command for a removed effect", () => {
@@ -256,20 +256,20 @@ describe("createEffectChainRenderer", () => {
 				makeInstance({ instanceId: "cecr-evict-b" }),
 			]);
 			renderer.renderFrame(0);
-			expect(fake.createPassCommand).toHaveBeenCalledTimes(2);
+			expect(fake.createEffectCommand).toHaveBeenCalledTimes(2);
 			renderer.setEffects([makeInstance({ instanceId: "cecr-evict-b" })]);
 			renderer.renderFrame(0);
 			// Only "cecr-evict-b" remains in the cache; if "cecr-evict-a" had been
 			// retained, no new command would be compiled. We rerun the chain after
 			// re-adding "cecr-evict-a" and assert a fresh compile to prove it was
 			// evicted.
-			fake.createPassCommand.mockClear();
+			fake.createEffectCommand.mockClear();
 			renderer.setEffects([
 				makeInstance({ instanceId: "cecr-evict-a" }),
 				makeInstance({ instanceId: "cecr-evict-b" }),
 			]);
 			renderer.renderFrame(0);
-			expect(fake.createPassCommand).toHaveBeenCalledTimes(1);
+			expect(fake.createEffectCommand).toHaveBeenCalledTimes(1);
 		});
 
 		it("does not evict commands when instance IDs are unchanged", () => {
@@ -279,7 +279,7 @@ describe("createEffectChainRenderer", () => {
 			renderer.resize(100, 100);
 			renderer.setEffects([makeInstance({ instanceId: "cecr-keep-a" })]);
 			renderer.renderFrame(0);
-			fake.createPassCommand.mockClear();
+			fake.createEffectCommand.mockClear();
 			renderer.setEffects([
 				makeInstance({
 					instanceId: "cecr-keep-a",
@@ -287,7 +287,7 @@ describe("createEffectChainRenderer", () => {
 				}),
 			]);
 			renderer.renderFrame(0);
-			expect(fake.createPassCommand).not.toHaveBeenCalled();
+			expect(fake.createEffectCommand).not.toHaveBeenCalled();
 		});
 
 		it("evicts replaced effect when same-length swap occurs", () => {
@@ -300,14 +300,14 @@ describe("createEffectChainRenderer", () => {
 				makeInstance({ instanceId: "cecr-swap-b" }),
 			]);
 			renderer.renderFrame(0);
-			fake.createPassCommand.mockClear();
+			fake.createEffectCommand.mockClear();
 			renderer.setEffects([
 				makeInstance({ instanceId: "cecr-swap-a" }),
 				makeInstance({ instanceId: "cecr-swap-c" }),
 			]);
 			renderer.renderFrame(0);
 			// "cecr-swap-c" is new → 1 compile.
-			expect(fake.createPassCommand).toHaveBeenCalledTimes(1);
+			expect(fake.createEffectCommand).toHaveBeenCalledTimes(1);
 		});
 
 		it("is a no-op after dispose", () => {
@@ -318,9 +318,9 @@ describe("createEffectChainRenderer", () => {
 			renderer.setEffects([makeInstance({ instanceId: "cecr-postdisp-a" })]);
 			renderer.renderFrame(0);
 			renderer.dispose();
-			fake.createPassCommand.mockClear();
+			fake.createEffectCommand.mockClear();
 			renderer.setEffects([makeInstance({ instanceId: "cecr-postdisp-b" })]);
-			expect(fake.createPassCommand).not.toHaveBeenCalled();
+			expect(fake.createEffectCommand).not.toHaveBeenCalled();
 		});
 	});
 

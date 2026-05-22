@@ -17,7 +17,16 @@ interface PassCommandOptions {
 
 export interface ReglContext {
 	readonly regl: Regl;
-	createPassCommand(opts: PassCommandOptions): DrawCommand;
+	/**
+	 * Draws to a framebuffer that's chosen per-invocation via the
+	 * `framebuffer` prop. Used by every effect pass in the chain.
+	 */
+	createEffectCommand(opts: PassCommandOptions): DrawCommand;
+	/**
+	 * Draws to the canvas (no framebuffer) inside a per-invocation `viewport`.
+	 * Used for the final letterboxed blit to screen.
+	 */
+	createScreenCommand(opts: PassCommandOptions): DrawCommand;
 	createImageTexture(bitmap: ImageBitmap): Texture2D;
 	createFramebuffer(width: number, height: number): Framebuffer2D;
 	destroy(): void;
@@ -57,15 +66,34 @@ export function createReglContext(
 	// Required: regl, unlike three, does not inject a precision qualifier.
 	const FRAGMENT_PRECISION = "precision highp float;\n";
 
-	function createPassCommand(opts: PassCommandOptions): DrawCommand {
-		return regl({
+	function baseCommandConfig(opts: PassCommandOptions) {
+		return {
 			vert: opts.vertexShader,
 			frag: FRAGMENT_PRECISION + opts.fragmentShader,
 			attributes: { a_position: positionBuffer },
 			uniforms: opts.uniforms,
-			primitive: "triangle strip",
+			primitive: "triangle strip" as const,
 			count: 4,
 			depth: { enable: false },
+		};
+	}
+
+	function createEffectCommand(opts: PassCommandOptions): DrawCommand {
+		return regl({
+			...baseCommandConfig(opts),
+			framebuffer: regl.prop<{ framebuffer: Framebuffer2D }, "framebuffer">(
+				"framebuffer",
+			),
+		});
+	}
+
+	function createScreenCommand(opts: PassCommandOptions): DrawCommand {
+		return regl({
+			...baseCommandConfig(opts),
+			viewport: regl.prop<
+				{ viewport: { x: number; y: number; width: number; height: number } },
+				"viewport"
+			>("viewport"),
 		});
 	}
 
@@ -105,7 +133,8 @@ export function createReglContext(
 
 	return {
 		regl,
-		createPassCommand,
+		createEffectCommand,
+		createScreenCommand,
 		createImageTexture,
 		createFramebuffer,
 		destroy,

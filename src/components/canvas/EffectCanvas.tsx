@@ -65,7 +65,7 @@ function EffectCanvasInner({ className }: EffectCanvasProps) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const ctxRef = useRef<ReglContext | null>(null);
 	const rendererRef = useRef<EffectChainRenderer | null>(null);
-	const blitRef = useRef<ReturnType<ReglContext["createPassCommand"]> | null>(
+	const blitRef = useRef<ReturnType<ReglContext["createScreenCommand"]> | null>(
 		null,
 	);
 	const frameRequestRef = useRef<number | null>(null);
@@ -118,7 +118,7 @@ function EffectCanvasInner({ className }: EffectCanvasProps) {
 			return;
 		}
 		const renderer = createEffectChainRenderer({ ctx });
-		const blit = ctx.createPassCommand({
+		const blit = ctx.createScreenCommand({
 			vertexShader: passthroughVert,
 			fragmentShader: passthroughFrag,
 			uniforms: {
@@ -218,7 +218,21 @@ function EffectCanvasInner({ className }: EffectCanvasProps) {
 		};
 	}, [invalidate]);
 
-	return <canvas ref={canvasRef} className={className} />;
+	// The canvas needs explicit fill-parent sizing — plain <canvas> defaults to
+	// 300×150, and getBoundingClientRect on that is what sizes our FBO and viewport.
+	return (
+		<canvas
+			ref={canvasRef}
+			className={className}
+			style={{
+				display: "block",
+				position: "absolute",
+				inset: 0,
+				width: "100%",
+				height: "100%",
+			}}
+		/>
+	);
 }
 
 export function EffectCanvas({ className }: EffectCanvasProps) {

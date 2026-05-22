@@ -42,7 +42,7 @@ export function exportImage(options: ExportOptions): Promise<void> {
 
 	const commandCache = new Map<string, DrawCommand>();
 
-	const blit = ctx.createPassCommand({
+	const blit = ctx.createScreenCommand({
 		vertexShader: passthroughVert,
 		fragmentShader: passthroughFrag,
 		uniforms: {
@@ -82,6 +82,7 @@ export function exportImage(options: ExportOptions): Promise<void> {
 			u_texture: finalTarget,
 			u_resolution: [width, height],
 			u_time: 0,
+			viewport: { x: 0, y: 0, width, height },
 		});
 	} catch (error) {
 		cleanup();

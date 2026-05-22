@@ -46,7 +46,7 @@ function buildCommand(ctx: ReglContext, def: EffectDefinition): DrawCommand {
 		const name = `u_${p.name}`;
 		uniforms[name] = ctx.regl.prop<Record<string, unknown>, string>(name);
 	}
-	return ctx.createPassCommand({
+	return ctx.createEffectCommand({
 		vertexShader: def.vertexShader,
 		fragmentShader: def.fragmentShader,
 		uniforms,

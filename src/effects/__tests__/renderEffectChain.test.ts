@@ -73,7 +73,7 @@ function setup(
 ) {
 	const calls: DrawCall[] = [];
 
-	const createPassCommand = vi.fn((): DrawCommand => {
+	const createEffectCommand = vi.fn((): DrawCommand => {
 		const cmd = vi.fn((props: Record<string, unknown>) => {
 			const { framebuffer, ...rest } = props;
 			calls.push({ framebuffer: framebuffer as Framebuffer2D, props: rest });
@@ -85,7 +85,7 @@ function setup(
 		regl: {
 			prop: (name: string) => name,
 		},
-		createPassCommand,
+		createEffectCommand,
 	} as unknown as ReglContext;
 
 	const texture = { __id: "tex" } as unknown as Texture2D;
@@ -105,7 +105,7 @@ function setup(
 			time: 1.5,
 		},
 		ctx,
-		createPassCommand,
+		createEffectCommand,
 		calls,
 		texture,
 		fbos,
@@ -166,7 +166,7 @@ describe("renderEffectChain", () => {
 
 	it("reuses cached command on subsequent calls", () => {
 		const cache = new Map<string, DrawCommand>();
-		const { params, createPassCommand } = setup(
+		const { params, createEffectCommand } = setup(
 			[makeInstance({ instanceId: "rc-reuse-1" })],
 			cache,
 		);
@@ -175,7 +175,7 @@ describe("renderEffectChain", () => {
 		renderEffectChain(params);
 		expect(cache.size).toBe(1);
 		expect(cache.get("rc-reuse-1")).toBe(cmd);
-		expect(createPassCommand).toHaveBeenCalledTimes(1);
+		expect(createEffectCommand).toHaveBeenCalledTimes(1);
 	});
 
 	it("passes the float instance parameter as a uniform prop", () => {
