@@ -8,7 +8,7 @@ const dither: EffectDefinition = {
 	name: "Lo-Fi Dither",
 	category: "aesthetic",
 	description:
-		"Pixelated 4-tone palette with Bayer ordered dithering. Hue-controllable palette for lo-fi posterized looks.",
+		"Pixelated palette (2-6 tones) with Bayer ordered dithering. Hue-controllable for lo-fi posterized looks.",
 	shortDescription: "pixel posterize",
 	parameters: [
 		{
@@ -61,7 +61,7 @@ const dither: EffectDefinition = {
 			type: "float",
 			default: 1.0,
 			min: 0,
-			max: 1.5,
+			max: 1,
 			step: 0.01,
 			label: "Saturation",
 		},
