@@ -1,4 +1,4 @@
-import type { DrawCommand, Framebuffer2D, Texture2D } from "regl";
+import type { Framebuffer2D, Texture2D } from "regl";
 
 import { renderEffectChain } from "@/effects/renderEffectChain";
 import type { EffectInstance } from "@/effects/types";
@@ -28,13 +28,17 @@ function createFramebufferPair(
 	] as const;
 }
 
-function haveEffectInstanceIdsChanged(
+function haveActiveEffectIdsChanged(
 	currentEffects: readonly EffectInstance[],
 	nextEffects: readonly EffectInstance[],
 ): boolean {
-	if (currentEffects.length !== nextEffects.length) return true;
-	const currentIds = new Set(currentEffects.map((e) => e.instanceId));
-	return nextEffects.some((e) => !currentIds.has(e.instanceId));
+	const currentIds = new Set(currentEffects.map((e) => e.effectId));
+	const nextIds = new Set(nextEffects.map((e) => e.effectId));
+	if (currentIds.size !== nextIds.size) return true;
+	for (const id of nextIds) {
+		if (!currentIds.has(id)) return true;
+	}
+	return false;
 }
 
 export function createEffectChainRenderer({
@@ -47,7 +51,13 @@ export function createEffectChainRenderer({
 	let height = 0;
 	let disposed = false;
 
-	const commandCache = new Map<string, DrawCommand>();
+	// Cache keyed by effectId — collapses to N entries where N = distinct effect
+	// types. Upper bound: |registered effects|. regl has no DrawCommand.destroy;
+	// commands are reclaimed only with the context.
+	const commandCache = new Map<
+		string,
+		{ cmd: import("regl").DrawCommand; props: Record<string, unknown> }
+	>();
 
 	const disposeFramebuffers = () => {
 		if (!fbos) return;
@@ -62,10 +72,8 @@ export function createEffectChainRenderer({
 		texture = null;
 	};
 
-	// regl has no DrawCommand.destroy; programs are reclaimed only with the
-	// context. Bounded by effect-definition count, so the leak is finite.
 	const evictInactiveCommands = () => {
-		const activeSet = new Set(effects.map((e) => e.instanceId));
+		const activeSet = new Set(effects.map((e) => e.effectId));
 		for (const id of commandCache.keys()) {
 			if (!activeSet.has(id)) {
 				commandCache.delete(id);
@@ -83,7 +91,7 @@ export function createEffectChainRenderer({
 		setEffects(nextEffects) {
 			if (disposed) return;
 			if (nextEffects === effects) return;
-			const idsChanged = haveEffectInstanceIdsChanged(effects, nextEffects);
+			const idsChanged = haveActiveEffectIdsChanged(effects, nextEffects);
 			effects = nextEffects;
 			if (idsChanged) {
 				evictInactiveCommands();

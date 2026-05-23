@@ -1,7 +1,6 @@
 import createREGL, {
 	type DrawCommand,
 	type Framebuffer2D,
-	type Regl,
 	type Texture2D,
 } from "regl";
 
@@ -16,7 +15,13 @@ interface PassCommandOptions {
 }
 
 export interface ReglContext {
-	readonly regl: Regl;
+	/** Bind a named uniform prop for use in a command config. */
+	prop(name: string): unknown;
+	/** Clear the default framebuffer. */
+	clear(opts: {
+		color?: readonly [number, number, number, number];
+		depth?: number;
+	}): void;
 	/**
 	 * Draws to a framebuffer that's chosen per-invocation via the
 	 * `framebuffer` prop. Used by every effect pass in the chain.
@@ -30,6 +35,15 @@ export interface ReglContext {
 	createImageTexture(bitmap: ImageBitmap): Texture2D;
 	createFramebuffer(width: number, height: number): Framebuffer2D;
 	destroy(): void;
+}
+
+/** Standard per-pass uniforms: texture input, resolution, and time. */
+export function createPassthroughUniforms(ctx: ReglContext): PassUniforms {
+	return {
+		u_texture: ctx.prop("u_texture"),
+		u_resolution: ctx.prop("u_resolution"),
+		u_time: ctx.prop("u_time"),
+	};
 }
 
 interface CreateReglContextOptions {
@@ -132,7 +146,9 @@ export function createReglContext(
 	}
 
 	return {
-		regl,
+		prop: (name) => regl.prop(name as never),
+		clear: (opts) =>
+			regl.clear(opts as unknown as Parameters<typeof regl.clear>[0]),
 		createEffectCommand,
 		createScreenCommand,
 		createImageTexture,

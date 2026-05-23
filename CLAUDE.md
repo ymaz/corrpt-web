@@ -33,6 +33,7 @@ npm run test:e2e # playwright test
 - **Color management**: regl context defaults to non-sRGB texture upload (`flipY: false`, `premultiplyAlpha: false`) — bitmaps are pre-flipped at decode time so UV (0,0) reads the bottom
 - **Geometry**: shared full-screen `[-1..1]` triangle strip owned by `reglContext`; vertex shaders write `gl_Position = vec4(a_position, 0.0, 1.0)` directly
 - **Shader uniforms required by all effects**: `u_texture` (sampler2D), `u_resolution` (vec2, px), `u_time` (float, seconds)
+- **Vertex inputs provided by the shared vertex shader** (`passthrough.vert`): `attribute vec2 a_position` (clip-space position) and `varying vec2 vUv` (0–1 UV, Y-up). Fragment shaders receive `vUv`; they do not need to declare or compute it.
 - **Fragment precision**: `precision highp float;` is auto-prepended by `createPassCommand` — do not declare it in `.frag` files
 
 ## Path aliases
