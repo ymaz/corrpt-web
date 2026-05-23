@@ -1,6 +1,11 @@
+import type { Framebuffer2D, Texture2D } from "regl";
+
 import type { RenderChainParams } from "@/effects/renderEffectChain";
 
-import { renderEffectChain } from "@/effects/renderEffectChain";
+import {
+	chainNeedsScratch,
+	renderEffectChain,
+} from "@/effects/renderEffectChain";
 import passthroughFrag from "@/effects/shaders/common/passthrough.frag";
 import passthroughVert from "@/effects/shaders/common/passthrough.vert";
 import type { EffectInstance } from "@/effects/types";
@@ -42,8 +47,16 @@ export function exportImage(options: ExportOptions): Promise<void> {
 		ctx.createFramebuffer(width, height),
 		ctx.createFramebuffer(width, height),
 	] as const;
+	const scratchFbos: readonly [Framebuffer2D, Framebuffer2D] | null =
+		chainNeedsScratch(effects)
+			? [
+					ctx.createFramebuffer(width, height),
+					ctx.createFramebuffer(width, height),
+				]
+			: null;
 
 	const commandCache: RenderChainParams["commandCache"] = new Map();
+	const auxTextureCache = new Map<string, Texture2D>();
 
 	const blit = ctx.createScreenCommand({
 		vertexShader: passthroughVert,
@@ -60,6 +73,9 @@ export function exportImage(options: ExportOptions): Promise<void> {
 		texture.destroy();
 		fbos[0].destroy();
 		fbos[1].destroy();
+		scratchFbos?.[0].destroy();
+		scratchFbos?.[1].destroy();
+		for (const tex of auxTextureCache.values()) tex.destroy();
 		ctx.destroy();
 	};
 
@@ -72,7 +88,9 @@ export function exportImage(options: ExportOptions): Promise<void> {
 			texture,
 			effects,
 			fbos,
+			scratchFbos,
 			commandCache,
+			auxTextureCache,
 			resolution: [width, height],
 			time,
 		});

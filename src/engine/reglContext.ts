@@ -33,6 +33,13 @@ export interface ReglContext {
 	 */
 	createScreenCommand(opts: PassCommandOptions): DrawCommand;
 	createImageTexture(bitmap: ImageBitmap): Texture2D;
+	/** Build a static RGBA8 texture (LUT, mask, …) from raw pixel data. */
+	createDataTexture(
+		width: number,
+		height: number,
+		data: Uint8Array,
+		filter?: "nearest" | "linear",
+	): Texture2D;
 	createFramebuffer(width: number, height: number): Framebuffer2D;
 	destroy(): void;
 }
@@ -129,6 +136,27 @@ export function createReglContext(
 		});
 	}
 
+	function createDataTexture(
+		width: number,
+		height: number,
+		data: Uint8Array,
+		filter: "nearest" | "linear" = "linear",
+	): Texture2D {
+		return regl.texture({
+			width,
+			height,
+			data,
+			format: "rgba",
+			type: "uint8",
+			min: filter,
+			mag: filter,
+			wrap: "clamp",
+			flipY: false,
+			premultiplyAlpha: false,
+			mipmap: false,
+		});
+	}
+
 	function createFramebuffer(width: number, height: number): Framebuffer2D {
 		return regl.framebuffer({
 			width,
@@ -152,6 +180,7 @@ export function createReglContext(
 		createEffectCommand,
 		createScreenCommand,
 		createImageTexture,
+		createDataTexture,
 		createFramebuffer,
 		destroy,
 	};

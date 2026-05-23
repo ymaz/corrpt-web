@@ -3,11 +3,13 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ReglContext } from "@/engine/reglContext";
 import { registerEffect } from "../registry";
-import { renderEffectChain } from "../renderEffectChain";
+import { type CachedEffect, renderEffectChain } from "../renderEffectChain";
 import type { EffectDefinition, EffectInstance } from "../types";
 
 const RC_EFFECT_ID = "rc-chain-effect";
 const RC_ENUM_EFFECT_ID = "rc-enum-effect";
+const RC_MULTIPASS_ID = "rc-multipass-effect";
+const RC_TEXTURE_ID = "rc-texture-effect";
 
 registerEffect({
 	id: RC_EFFECT_ID,
@@ -52,6 +54,46 @@ registerEffect({
 	fragmentShader: "",
 } satisfies EffectDefinition);
 
+// Three passes: pass 0 and 1 are intermediate (scratch), pass 2 composites the
+// original via u_source. Exercises ping-pong, "source" input, and u_source.
+registerEffect({
+	id: RC_MULTIPASS_ID,
+	name: "RC Multipass",
+	category: "aesthetic",
+	description: "",
+	parameters: [],
+	vertexShader: "vert",
+	fragmentShader: "ignored",
+	passes: [
+		{ fragmentShader: "// blur-h\ntexture2D(u_texture, vUv);" },
+		{ fragmentShader: "// blur-v\ntexture2D(u_texture, vUv);" },
+		{
+			fragmentShader: "// composite\ntexture2D(u_source, vUv);",
+			input: "source",
+		},
+	],
+} satisfies EffectDefinition);
+
+// Single-pass effect with one auxiliary LUT texture sampled as u_lut.
+registerEffect({
+	id: RC_TEXTURE_ID,
+	name: "RC Texture",
+	category: "color",
+	description: "",
+	parameters: [],
+	textures: [
+		{
+			name: "lut",
+			width: 2,
+			height: 1,
+			data: new Uint8Array(8),
+			filter: "nearest",
+		},
+	],
+	vertexShader: "vert",
+	fragmentShader: "texture2D(u_lut, vUv);",
+} satisfies EffectDefinition);
+
 function makeInstance(overrides?: Partial<EffectInstance>): EffectInstance {
 	return {
 		instanceId: "rc-i1",
@@ -67,10 +109,7 @@ interface DrawCall {
 	props: Record<string, unknown>;
 }
 
-type CacheMap = Map<
-	string,
-	{ cmd: DrawCommand; props: Record<string, unknown> }
->;
+type CacheMap = Map<string, CachedEffect>;
 
 function setup(effects: EffectInstance[] = [], cache: CacheMap = new Map()) {
 	const calls: DrawCall[] = [];
@@ -83,9 +122,19 @@ function setup(effects: EffectInstance[] = [], cache: CacheMap = new Map()) {
 		return cmd;
 	});
 
+	const dataTextures: Texture2D[] = [];
+	const createDataTexture = vi.fn((): Texture2D => {
+		const tex = {
+			__id: `data-tex-${dataTextures.length}`,
+		} as unknown as Texture2D;
+		dataTextures.push(tex);
+		return tex;
+	});
+
 	const ctx = {
 		prop: (name: string) => name,
 		createEffectCommand,
+		createDataTexture,
 	} as unknown as ReglContext;
 
 	const texture = { __id: "tex" } as unknown as Texture2D;
@@ -93,6 +142,11 @@ function setup(effects: EffectInstance[] = [], cache: CacheMap = new Map()) {
 		{ __id: "fbo0" } as unknown as Framebuffer2D,
 		{ __id: "fbo1" } as unknown as Framebuffer2D,
 	] as [Framebuffer2D, Framebuffer2D];
+	const scratchFbos = [
+		{ __id: "scratch0" } as unknown as Framebuffer2D,
+		{ __id: "scratch1" } as unknown as Framebuffer2D,
+	] as [Framebuffer2D, Framebuffer2D];
+	const auxTextureCache = new Map<string, Texture2D>();
 
 	return {
 		params: {
@@ -100,15 +154,20 @@ function setup(effects: EffectInstance[] = [], cache: CacheMap = new Map()) {
 			texture,
 			effects,
 			fbos,
+			scratchFbos,
 			commandCache: cache,
+			auxTextureCache,
 			resolution: [100, 100] as [number, number],
 			time: 1.5,
 		},
 		ctx,
 		createEffectCommand,
+		createDataTexture,
 		calls,
 		texture,
 		fbos,
+		scratchFbos,
+		auxTextureCache,
 		cache,
 	};
 }
@@ -285,5 +344,79 @@ describe("renderEffectChain", () => {
 		]);
 		renderEffectChain(params);
 		expect(calls[0].props.u_mode).toBe(0);
+	});
+
+	describe("multi-pass effects", () => {
+		const multipass = (): EffectInstance => ({
+			instanceId: "rc-mp-1",
+			effectId: RC_MULTIPASS_ID,
+			enabled: true,
+			parameters: {},
+		});
+
+		it("compiles one DrawCommand per declared pass", () => {
+			const { params, createEffectCommand } = setup([multipass()]);
+			renderEffectChain(params);
+			expect(createEffectCommand).toHaveBeenCalledTimes(3);
+		});
+
+		it("invokes every pass and writes the final pass to the outer target", () => {
+			const { params, calls, fbos, scratchFbos } = setup([multipass()]);
+			const result = renderEffectChain(params);
+			expect(calls).toHaveLength(3);
+			// Intermediate passes ping-pong through scratch.
+			expect(calls[0].framebuffer).toBe(scratchFbos[0]);
+			expect(calls[1].framebuffer).toBe(scratchFbos[1]);
+			// Final pass writes the outer FBO and is the returned target.
+			expect(calls[2].framebuffer).toBe(fbos[1]);
+			expect(result).toBe(fbos[1]);
+		});
+
+		it('feeds the prior pass output forward and honors input: "source"', () => {
+			const { params, calls, texture, scratchFbos } = setup([multipass()]);
+			renderEffectChain(params);
+			// Pass 0 reads the effect input (the original texture here).
+			expect(calls[0].props.u_texture).toBe(texture);
+			// Pass 1 reads pass 0's scratch output.
+			expect(calls[1].props.u_texture).toBe(scratchFbos[0]);
+			// Pass 2 declared input "source" → reads the effect input again.
+			expect(calls[2].props.u_texture).toBe(texture);
+		});
+
+		it("binds u_source only on passes whose shader references it", () => {
+			const { params, calls, texture } = setup([multipass()]);
+			renderEffectChain(params);
+			expect(calls[0].props.u_source).toBeUndefined();
+			expect(calls[1].props.u_source).toBeUndefined();
+			// The composite pass samples u_source → bound to the effect input.
+			expect(calls[2].props.u_source).toBe(texture);
+		});
+	});
+
+	describe("auxiliary textures", () => {
+		const withTexture = (): EffectInstance => ({
+			instanceId: "rc-tex-i1",
+			effectId: RC_TEXTURE_ID,
+			enabled: true,
+			parameters: {},
+		});
+
+		it("creates each declared texture once and caches it", () => {
+			const { params, createDataTexture, auxTextureCache } = setup([
+				withTexture(),
+			]);
+			renderEffectChain(params);
+			renderEffectChain(params);
+			expect(createDataTexture).toHaveBeenCalledTimes(1);
+			expect(auxTextureCache.has(`${RC_TEXTURE_ID}:lut`)).toBe(true);
+		});
+
+		it("binds the cached texture as u_lut on the pass that samples it", () => {
+			const { params, calls, auxTextureCache } = setup([withTexture()]);
+			renderEffectChain(params);
+			expect(calls[0].props.u_lut).toBe(
+				auxTextureCache.get(`${RC_TEXTURE_ID}:lut`),
+			);
+		});
 	});
 });
