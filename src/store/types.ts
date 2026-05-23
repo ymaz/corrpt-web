@@ -33,6 +33,8 @@ export type ImageStore = ImageState & ImageActions;
 interface EffectState {
 	effects: EffectInstance[];
 	previewMode: PreviewMode;
+	canUndo: boolean;
+	canRedo: boolean;
 }
 
 interface EffectActions {
@@ -47,9 +49,34 @@ interface EffectActions {
 	reorderEffects: (instanceIds: string[]) => void;
 	duplicateEffect: (instanceId: string) => void;
 	setPreviewMode: (mode: PreviewMode) => void;
+	// Replaces the whole stack with fresh instanceIds — used by preset application.
+	applyEffects: (effects: EffectInstance[]) => void;
+	undo: () => void;
+	redo: () => void;
 }
 
 export type EffectStore = EffectState & EffectActions;
+
+// Preset store
+export interface Preset {
+	id: string;
+	name: string;
+	createdAt: number;
+	effects: EffectInstance[];
+}
+
+interface PresetState {
+	presets: Preset[];
+}
+
+interface PresetActions {
+	savePreset: (name: string) => void;
+	applyPreset: (id: string) => void;
+	renamePreset: (id: string, name: string) => void;
+	deletePreset: (id: string) => void;
+}
+
+export type PresetStore = PresetState & PresetActions;
 
 // UI store
 interface UIState {

@@ -34,6 +34,7 @@ function createEffectInstance(effectId: string): EffectInstance {
 }
 
 export const MAX_EFFECT_INSTANCES = 3;
+const HISTORY_LIMIT = 100;
 
 // Module-level clock — advanced per rendered frame by EffectCanvas, read at
 // export time. Kept outside Zustand so writes don't trigger the notification cycle.
@@ -43,103 +44,182 @@ export const setTime = (t: number): void => {
 	_time = t;
 };
 
-export const useEffectStore = create<EffectStore>((set, get) => ({
-	effects: [],
-	previewMode: "full",
+// Undo history lives outside Zustand state: it never drives rendering and we
+// don't want snapshots to participate in shallow-equality selectors.
+let past: EffectInstance[][] = [];
+let future: EffectInstance[][] = [];
 
-	addEffect: (effectId: string) => {
-		const { effects } = get();
-		if (
-			effects.filter((e) => e.effectId === effectId).length >=
-			MAX_EFFECT_INSTANCES
-		)
-			return;
-		set({ effects: [...effects, createEffectInstance(effectId)] });
-	},
+// Coalescing key for the most recent setEffectParam push. While consecutive
+// edits target the same (instanceId, paramName), they share a single undo entry
+// so dragging a slider collapses to one step. Cleared by any other mutation.
+let coalesceKey: string | null = null;
 
-	removeEffect: (instanceId: string) => {
-		const { effects } = get();
-		set({
-			effects: effects.filter((effect) => effect.instanceId !== instanceId),
-		});
-	},
+function flags() {
+	return { canUndo: past.length > 0, canRedo: future.length > 0 };
+}
 
-	removeEffectsByEffectId: (effectId: string) => {
-		const { effects } = get();
-		set({
-			effects: effects.filter((effect) => effect.effectId !== effectId),
-		});
-	},
+// Test-only: clears the module-level undo/redo history so suites start clean.
+export function _resetHistory(): void {
+	past = [];
+	future = [];
+	coalesceKey = null;
+}
 
-	setEffectParam: (
-		instanceId: string,
-		paramName: string,
-		value: EffectParameterValue,
-	) => {
-		const { effects } = get();
-		if (!effects.some((effect) => effect.instanceId === instanceId)) return;
-
-		set({
-			effects: effects.map((effect) =>
-				effect.instanceId === instanceId
-					? {
-							...effect,
-							parameters: {
-								...effect.parameters,
-								[paramName]: structuredClone(value),
-							},
-						}
-					: effect,
-			),
-		});
-	},
-
-	reorderEffects: (instanceIds: string[]) => {
-		const { effects } = get();
-		if (instanceIds.length !== effects.length) return;
-
-		const effectsById = new Map(
-			effects.map((effect) => [effect.instanceId, effect]),
-		);
-		const nextEffects: EffectInstance[] = [];
-		const seenInstanceIds = new Set<string>();
-
-		for (const instanceId of instanceIds) {
-			if (seenInstanceIds.has(instanceId)) return;
-			const effect = effectsById.get(instanceId);
-			if (!effect) return;
-			seenInstanceIds.add(instanceId);
-			nextEffects.push(effect);
+export const useEffectStore = create<EffectStore>((set, get) => {
+	// Snapshot current effects onto the undo stack before a mutation. `key`
+	// enables coalescing: a repeated key replaces the prior history entry's
+	// "redo target" rather than pushing a new one.
+	function pushHistory(key: string | null): void {
+		const snapshot = structuredClone(get().effects);
+		const coalesced = key !== null && key === coalesceKey && past.length > 0;
+		if (!coalesced) {
+			past.push(snapshot);
+			if (past.length > HISTORY_LIMIT) past.shift();
 		}
+		future = [];
+		coalesceKey = key;
+	}
 
-		set({ effects: nextEffects });
-	},
+	return {
+		effects: [],
+		previewMode: "full",
+		canUndo: false,
+		canRedo: false,
 
-	duplicateEffect: (instanceId: string) => {
-		const { effects } = get();
-		const sourceIndex = effects.findIndex(
-			(effect) => effect.instanceId === instanceId,
-		);
-		if (sourceIndex === -1) return;
+		addEffect: (effectId: string) => {
+			const { effects } = get();
+			if (
+				effects.filter((e) => e.effectId === effectId).length >=
+				MAX_EFFECT_INSTANCES
+			)
+				return;
+			pushHistory(null);
+			set({
+				effects: [...effects, createEffectInstance(effectId)],
+				...flags(),
+			});
+		},
 
-		const source = effects[sourceIndex];
-		if (
-			effects.filter((e) => e.effectId === source.effectId).length >=
-			MAX_EFFECT_INSTANCES
-		)
-			return;
-		const duplicate: EffectInstance = {
-			...source,
-			instanceId: createInstanceId(source.effectId),
-			parameters: structuredClone(source.parameters),
-		};
-		const nextEffects = [...effects];
-		nextEffects.splice(sourceIndex + 1, 0, duplicate);
+		removeEffect: (instanceId: string) => {
+			const { effects } = get();
+			if (!effects.some((effect) => effect.instanceId === instanceId)) return;
+			pushHistory(null);
+			set({
+				effects: effects.filter((effect) => effect.instanceId !== instanceId),
+				...flags(),
+			});
+		},
 
-		set({ effects: nextEffects });
-	},
+		removeEffectsByEffectId: (effectId: string) => {
+			const { effects } = get();
+			if (!effects.some((effect) => effect.effectId === effectId)) return;
+			pushHistory(null);
+			set({
+				effects: effects.filter((effect) => effect.effectId !== effectId),
+				...flags(),
+			});
+		},
 
-	setPreviewMode: (mode) => {
-		set({ previewMode: mode });
-	},
-}));
+		setEffectParam: (
+			instanceId: string,
+			paramName: string,
+			value: EffectParameterValue,
+		) => {
+			const { effects } = get();
+			if (!effects.some((effect) => effect.instanceId === instanceId)) return;
+
+			pushHistory(`${instanceId}|${paramName}`);
+			set({
+				effects: effects.map((effect) =>
+					effect.instanceId === instanceId
+						? {
+								...effect,
+								parameters: {
+									...effect.parameters,
+									[paramName]: structuredClone(value),
+								},
+							}
+						: effect,
+				),
+				...flags(),
+			});
+		},
+
+		reorderEffects: (instanceIds: string[]) => {
+			const { effects } = get();
+			if (instanceIds.length !== effects.length) return;
+
+			const effectsById = new Map(
+				effects.map((effect) => [effect.instanceId, effect]),
+			);
+			const nextEffects: EffectInstance[] = [];
+			const seenInstanceIds = new Set<string>();
+
+			for (const instanceId of instanceIds) {
+				if (seenInstanceIds.has(instanceId)) return;
+				const effect = effectsById.get(instanceId);
+				if (!effect) return;
+				seenInstanceIds.add(instanceId);
+				nextEffects.push(effect);
+			}
+
+			pushHistory(null);
+			set({ effects: nextEffects, ...flags() });
+		},
+
+		duplicateEffect: (instanceId: string) => {
+			const { effects } = get();
+			const sourceIndex = effects.findIndex(
+				(effect) => effect.instanceId === instanceId,
+			);
+			if (sourceIndex === -1) return;
+
+			const source = effects[sourceIndex];
+			if (
+				effects.filter((e) => e.effectId === source.effectId).length >=
+				MAX_EFFECT_INSTANCES
+			)
+				return;
+			const duplicate: EffectInstance = {
+				...source,
+				instanceId: createInstanceId(source.effectId),
+				parameters: structuredClone(source.parameters),
+			};
+			const nextEffects = [...effects];
+			nextEffects.splice(sourceIndex + 1, 0, duplicate);
+
+			pushHistory(null);
+			set({ effects: nextEffects, ...flags() });
+		},
+
+		applyEffects: (effects: EffectInstance[]) => {
+			const next = effects.map((effect) => ({
+				...effect,
+				instanceId: createInstanceId(effect.effectId),
+				parameters: structuredClone(effect.parameters),
+			}));
+			pushHistory(null);
+			set({ effects: next, ...flags() });
+		},
+
+		undo: () => {
+			if (past.length === 0) return;
+			const previous = past.pop() as EffectInstance[];
+			future.push(structuredClone(get().effects));
+			coalesceKey = null;
+			set({ effects: previous, ...flags() });
+		},
+
+		redo: () => {
+			if (future.length === 0) return;
+			const next = future.pop() as EffectInstance[];
+			past.push(structuredClone(get().effects));
+			coalesceKey = null;
+			set({ effects: next, ...flags() });
+		},
+
+		setPreviewMode: (mode) => {
+			set({ previewMode: mode });
+		},
+	};
+});
