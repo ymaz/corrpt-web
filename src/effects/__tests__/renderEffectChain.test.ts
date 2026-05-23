@@ -67,10 +67,12 @@ interface DrawCall {
 	props: Record<string, unknown>;
 }
 
-function setup(
-	effects: EffectInstance[] = [],
-	cache = new Map<string, DrawCommand>(),
-) {
+type CacheMap = Map<
+	string,
+	{ cmd: DrawCommand; props: Record<string, unknown> }
+>;
+
+function setup(effects: EffectInstance[] = [], cache: CacheMap = new Map()) {
 	const calls: DrawCall[] = [];
 
 	const createEffectCommand = vi.fn((): DrawCommand => {
@@ -82,9 +84,7 @@ function setup(
 	});
 
 	const ctx = {
-		regl: {
-			prop: (name: string) => name,
-		},
+		prop: (name: string) => name,
 		createEffectCommand,
 	} as unknown as ReglContext;
 
@@ -154,28 +154,42 @@ describe("renderEffectChain", () => {
 		expect(result).toBe(fbos[0]);
 	});
 
-	it("creates a DrawCommand and stores it in commandCache", () => {
-		const cache = new Map<string, DrawCommand>();
+	it("creates a CachedCommand entry keyed by effectId", () => {
+		const cache: CacheMap = new Map();
 		const { params } = setup(
 			[makeInstance({ instanceId: "rc-cache-1" })],
 			cache,
 		);
 		renderEffectChain(params);
-		expect(cache.has("rc-cache-1")).toBe(true);
+		expect(cache.has(RC_EFFECT_ID)).toBe(true);
 	});
 
-	it("reuses cached command on subsequent calls", () => {
-		const cache = new Map<string, DrawCommand>();
+	it("reuses the cached command on subsequent calls", () => {
+		const cache: CacheMap = new Map();
 		const { params, createEffectCommand } = setup(
 			[makeInstance({ instanceId: "rc-reuse-1" })],
 			cache,
 		);
 		renderEffectChain(params);
-		const cmd = cache.get("rc-reuse-1");
+		const entry = cache.get(RC_EFFECT_ID);
 		renderEffectChain(params);
 		expect(cache.size).toBe(1);
-		expect(cache.get("rc-reuse-1")).toBe(cmd);
+		expect(cache.get(RC_EFFECT_ID)).toBe(entry);
 		expect(createEffectCommand).toHaveBeenCalledTimes(1);
+	});
+
+	it("two instances of the same effectId share one CachedCommand", () => {
+		const cache: CacheMap = new Map();
+		const { params, createEffectCommand } = setup(
+			[
+				makeInstance({ instanceId: "rc-a" }),
+				makeInstance({ instanceId: "rc-b" }),
+			],
+			cache,
+		);
+		renderEffectChain(params);
+		expect(createEffectCommand).toHaveBeenCalledTimes(1);
+		expect(cache.size).toBe(1);
 	});
 
 	it("passes the float instance parameter as a uniform prop", () => {

@@ -34,6 +34,10 @@ export default defineConfig({
 							name: "vendor-react",
 							test: /node_modules[\\/](react|react-dom)[\\/]/,
 						},
+						{
+							name: "vendor-regl",
+							test: /node_modules[\\/]regl[\\/]/,
+						},
 					],
 				},
 			},

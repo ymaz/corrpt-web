@@ -1,10 +1,13 @@
-import type { DrawCommand } from "regl";
+import type { RenderChainParams } from "@/effects/renderEffectChain";
 
 import { renderEffectChain } from "@/effects/renderEffectChain";
 import passthroughFrag from "@/effects/shaders/common/passthrough.frag";
 import passthroughVert from "@/effects/shaders/common/passthrough.vert";
 import type { EffectInstance } from "@/effects/types";
-import { createReglContext } from "@/engine/reglContext";
+import {
+	createPassthroughUniforms,
+	createReglContext,
+} from "@/engine/reglContext";
 import { LOSSY_EXPORT_QUALITY, MIME_TO_EXT } from "@/lib/constants";
 
 export interface ExportOptions {
@@ -40,21 +43,12 @@ export function exportImage(options: ExportOptions): Promise<void> {
 		ctx.createFramebuffer(width, height),
 	] as const;
 
-	const commandCache = new Map<string, DrawCommand>();
+	const commandCache: RenderChainParams["commandCache"] = new Map();
 
 	const blit = ctx.createScreenCommand({
 		vertexShader: passthroughVert,
 		fragmentShader: passthroughFrag,
-		uniforms: {
-			u_texture: ctx.regl.prop<{ u_texture: unknown }, "u_texture">(
-				"u_texture",
-			),
-			u_resolution: ctx.regl.prop<
-				{ u_resolution: [number, number] },
-				"u_resolution"
-			>("u_resolution"),
-			u_time: ctx.regl.prop<{ u_time: number }, "u_time">("u_time"),
-		},
+		uniforms: createPassthroughUniforms(ctx),
 	});
 
 	// Idempotent: a late toBlob callback can fire after the timeout has already

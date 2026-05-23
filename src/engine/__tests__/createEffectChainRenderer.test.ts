@@ -7,6 +7,7 @@ import type { ReglContext } from "@/engine/reglContext";
 import { createEffectChainRenderer } from "../createEffectChainRenderer";
 
 const TEST_EFFECT_ID = "cecr-test-effect";
+const TEST_EFFECT_ID_2 = "cecr-test-effect-2";
 
 registerEffect({
 	id: TEST_EFFECT_ID,
@@ -24,6 +25,16 @@ registerEffect({
 			step: 0.01,
 		},
 	],
+	vertexShader: "",
+	fragmentShader: "",
+} satisfies EffectDefinition);
+
+registerEffect({
+	id: TEST_EFFECT_ID_2,
+	name: "CECR Test 2",
+	category: "noise",
+	description: "",
+	parameters: [],
 	vertexShader: "",
 	fragmentShader: "",
 } satisfies EffectDefinition);
@@ -84,7 +95,8 @@ function makeFakeContext(): FakeContext {
 	});
 
 	const ctx = {
-		regl: { prop: (n: string) => n },
+		prop: (n: string) => n,
+		clear: vi.fn(),
 		createFramebuffer,
 		createImageTexture,
 		createEffectCommand,
@@ -246,33 +258,60 @@ describe("createEffectChainRenderer", () => {
 			expect(fake.createEffectCommand).not.toHaveBeenCalled();
 		});
 
-		it("evicts cached command for a removed effect", () => {
+		it("multiple instances of the same effectId share one DrawCommand", () => {
+			const fake = makeFakeContext();
+			const renderer = createEffectChainRenderer({ ctx: fake.ctx });
+			renderer.setImage(makeFakeBitmap());
+			renderer.resize(100, 100);
+			// Two instances, same effectId → one compile.
+			renderer.setEffects([
+				makeInstance({ instanceId: "cecr-shared-a" }),
+				makeInstance({ instanceId: "cecr-shared-b" }),
+			]);
+			renderer.renderFrame(0);
+			expect(fake.createEffectCommand).toHaveBeenCalledTimes(1);
+			// Both passes still execute.
+			expect(fake.drawCalls).toHaveLength(2);
+		});
+
+		it("evicts cached command when an effectId is fully removed from the chain", () => {
 			const fake = makeFakeContext();
 			const renderer = createEffectChainRenderer({ ctx: fake.ctx });
 			renderer.setImage(makeFakeBitmap());
 			renderer.resize(100, 100);
 			renderer.setEffects([
-				makeInstance({ instanceId: "cecr-evict-a" }),
-				makeInstance({ instanceId: "cecr-evict-b" }),
+				makeInstance({ instanceId: "cecr-evict-a", effectId: TEST_EFFECT_ID }),
+				makeInstance({
+					instanceId: "cecr-evict-b",
+					effectId: TEST_EFFECT_ID_2,
+				}),
 			]);
 			renderer.renderFrame(0);
 			expect(fake.createEffectCommand).toHaveBeenCalledTimes(2);
-			renderer.setEffects([makeInstance({ instanceId: "cecr-evict-b" })]);
-			renderer.renderFrame(0);
-			// Only "cecr-evict-b" remains in the cache; if "cecr-evict-a" had been
-			// retained, no new command would be compiled. We rerun the chain after
-			// re-adding "cecr-evict-a" and assert a fresh compile to prove it was
-			// evicted.
-			fake.createEffectCommand.mockClear();
+
+			// Remove TEST_EFFECT_ID entirely — its command should be evicted.
 			renderer.setEffects([
-				makeInstance({ instanceId: "cecr-evict-a" }),
-				makeInstance({ instanceId: "cecr-evict-b" }),
+				makeInstance({
+					instanceId: "cecr-evict-b",
+					effectId: TEST_EFFECT_ID_2,
+				}),
+			]);
+			renderer.renderFrame(0);
+			fake.createEffectCommand.mockClear();
+
+			// Re-add TEST_EFFECT_ID — must trigger a fresh compile.
+			renderer.setEffects([
+				makeInstance({ instanceId: "cecr-evict-a", effectId: TEST_EFFECT_ID }),
+				makeInstance({
+					instanceId: "cecr-evict-b",
+					effectId: TEST_EFFECT_ID_2,
+				}),
 			]);
 			renderer.renderFrame(0);
 			expect(fake.createEffectCommand).toHaveBeenCalledTimes(1);
 		});
 
-		it("does not evict commands when instance IDs are unchanged", () => {
+		it("does not evict commands when the effectId set is unchanged", () => {
 			const fake = makeFakeContext();
 			const renderer = createEffectChainRenderer({ ctx: fake.ctx });
 			renderer.setImage(makeFakeBitmap());
@@ -280,9 +319,10 @@ describe("createEffectChainRenderer", () => {
 			renderer.setEffects([makeInstance({ instanceId: "cecr-keep-a" })]);
 			renderer.renderFrame(0);
 			fake.createEffectCommand.mockClear();
+			// Same effectId, different instanceId and parameters — no recompile.
 			renderer.setEffects([
 				makeInstance({
-					instanceId: "cecr-keep-a",
+					instanceId: "cecr-keep-b",
 					parameters: { amount: 0.9 },
 				}),
 			]);
@@ -290,24 +330,24 @@ describe("createEffectChainRenderer", () => {
 			expect(fake.createEffectCommand).not.toHaveBeenCalled();
 		});
 
-		it("evicts replaced effect when same-length swap occurs", () => {
+		it("evicts replaced effectId when a same-length swap occurs", () => {
 			const fake = makeFakeContext();
 			const renderer = createEffectChainRenderer({ ctx: fake.ctx });
 			renderer.setImage(makeFakeBitmap());
 			renderer.resize(100, 100);
 			renderer.setEffects([
-				makeInstance({ instanceId: "cecr-swap-a" }),
-				makeInstance({ instanceId: "cecr-swap-b" }),
+				makeInstance({ instanceId: "cecr-swap-a", effectId: TEST_EFFECT_ID }),
+				makeInstance({ instanceId: "cecr-swap-b", effectId: TEST_EFFECT_ID_2 }),
 			]);
 			renderer.renderFrame(0);
 			fake.createEffectCommand.mockClear();
+			// Swap TEST_EFFECT_ID_2 back to TEST_EFFECT_ID (single-effect chain).
 			renderer.setEffects([
-				makeInstance({ instanceId: "cecr-swap-a" }),
-				makeInstance({ instanceId: "cecr-swap-c" }),
+				makeInstance({ instanceId: "cecr-swap-c", effectId: TEST_EFFECT_ID }),
 			]);
 			renderer.renderFrame(0);
-			// "cecr-swap-c" is new → 1 compile.
-			expect(fake.createEffectCommand).toHaveBeenCalledTimes(1);
+			// TEST_EFFECT_ID_2 evicted; TEST_EFFECT_ID already cached → 0 new compiles.
+			expect(fake.createEffectCommand).not.toHaveBeenCalled();
 		});
 
 		it("is a no-op after dispose", () => {

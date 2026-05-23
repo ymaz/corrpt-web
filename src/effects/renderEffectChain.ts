@@ -4,12 +4,18 @@ import { getEffect } from "@/effects/registry";
 import type { EffectDefinition, EffectInstance } from "@/effects/types";
 import type { ReglContext } from "@/engine/reglContext";
 
+interface CachedCommand {
+	cmd: DrawCommand;
+	/** Scratch props object mutated in-place every frame — avoids per-frame allocation. */
+	props: Record<string, unknown>;
+}
+
 export interface RenderChainParams {
 	ctx: ReglContext;
 	texture: Texture2D;
 	effects: readonly EffectInstance[];
 	fbos: readonly [Framebuffer2D, Framebuffer2D];
-	commandCache: Map<string, DrawCommand>;
+	commandCache: Map<string, CachedCommand>;
 	resolution: readonly [number, number];
 	time: number;
 }
@@ -30,27 +36,32 @@ function getEnumMaps(def: EffectDefinition): Map<string, Map<string, number>> {
 	return maps;
 }
 
-function buildCommand(ctx: ReglContext, def: EffectDefinition): DrawCommand {
+function buildCommand(ctx: ReglContext, def: EffectDefinition): CachedCommand {
 	const uniforms: Record<string, unknown> = {
-		u_texture: ctx.regl.prop<
-			{ u_texture: Texture2D | Framebuffer2D },
-			"u_texture"
-		>("u_texture"),
-		u_resolution: ctx.regl.prop<
-			{ u_resolution: [number, number] },
-			"u_resolution"
-		>("u_resolution"),
-		u_time: ctx.regl.prop<{ u_time: number }, "u_time">("u_time"),
+		u_texture: ctx.prop("u_texture"),
+		u_resolution: ctx.prop("u_resolution"),
+		u_time: ctx.prop("u_time"),
 	};
 	for (const p of def.parameters) {
 		const name = `u_${p.name}`;
-		uniforms[name] = ctx.regl.prop<Record<string, unknown>, string>(name);
+		uniforms[name] = ctx.prop(name);
 	}
-	return ctx.createEffectCommand({
+	const cmd = ctx.createEffectCommand({
 		vertexShader: def.vertexShader,
 		fragmentShader: def.fragmentShader,
 		uniforms,
 	});
+	// Pre-allocate scratch props including the framebuffer slot.
+	const props: Record<string, unknown> = {
+		u_texture: undefined,
+		u_resolution: undefined,
+		u_time: undefined,
+		framebuffer: undefined,
+	};
+	for (const p of def.parameters) {
+		props[`u_${p.name}`] = undefined;
+	}
+	return { cmd, props };
 }
 
 /** Returns the input Texture2D if no effects ran, else the last Framebuffer2D. */
@@ -71,20 +82,25 @@ export function renderEffectChain(
 
 		const enumMaps = getEnumMaps(def);
 
-		let cmd = commandCache.get(effect.instanceId);
-		if (!cmd) {
-			cmd = buildCommand(ctx, def);
-			commandCache.set(effect.instanceId, cmd);
+		// Cache keyed by effectId — all instances of the same effect type share
+		// one DrawCommand (regl shares the GPU program anyway; this collapses the
+		// JS-side cache to N entries where N = distinct effect types in the chain).
+		let entry = commandCache.get(effect.effectId);
+		if (!entry) {
+			entry = buildCommand(ctx, def);
+			commandCache.set(effect.effectId, entry);
 		}
+
+		const { cmd, props } = entry;
 
 		const inputTexture: Texture2D | Framebuffer2D =
 			passCount === 0 ? texture : fbos[readIndex];
 
-		const props: Record<string, unknown> = {
-			u_texture: inputTexture,
-			u_resolution: resolution,
-			u_time: time,
-		};
+		// Mutate scratch props in-place — no per-frame allocation.
+		props.u_texture = inputTexture;
+		props.u_resolution = resolution;
+		props.u_time = time;
+
 		for (const p of def.parameters) {
 			const val = effect.parameters[p.name];
 			const name = `u_${p.name}`;
@@ -101,10 +117,10 @@ export function renderEffectChain(
 						props[name] = enumMaps.get(p.name)?.get(p.default) ?? 0;
 						break;
 					case "vec2":
-						props[name] = [p.default[0], p.default[1]];
+						props[name] = (p.default as readonly number[]).slice();
 						break;
 					case "color":
-						props[name] = [p.default[0], p.default[1], p.default[2]];
+						props[name] = (p.default as readonly number[]).slice();
 						break;
 				}
 				continue;
@@ -120,21 +136,18 @@ export function renderEffectChain(
 				case "enum":
 					props[name] = enumMaps.get(p.name)?.get(val as string) ?? 0;
 					break;
-				case "vec2": {
-					const v = val as [number, number];
-					props[name] = [v[0], v[1]];
+				case "vec2":
+					props[name] = val;
 					break;
-				}
-				case "color": {
-					const c = val as [number, number, number];
-					props[name] = [c[0], c[1], c[2]];
+				case "color":
+					props[name] = val;
 					break;
-				}
 			}
 		}
 
 		const writeIndex = 1 - readIndex;
-		cmd({ ...props, framebuffer: fbos[writeIndex] });
+		props.framebuffer = fbos[writeIndex];
+		cmd(props);
 
 		readIndex = writeIndex;
 		passCount++;

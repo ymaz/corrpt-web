@@ -8,7 +8,11 @@ import {
 	createEffectChainRenderer,
 	type EffectChainRenderer,
 } from "@/engine/createEffectChainRenderer";
-import { createReglContext, type ReglContext } from "@/engine/reglContext";
+import {
+	createPassthroughUniforms,
+	createReglContext,
+	type ReglContext,
+} from "@/engine/reglContext";
 import { getTime, setTime, useEffectStore } from "@/store/effectStore";
 import { useImageStore } from "@/store/imageStore";
 
@@ -94,7 +98,7 @@ function EffectCanvasInner({ className }: EffectCanvasProps) {
 			const output = renderer.renderFrame(time);
 			const fv = fittedViewportRef.current;
 
-			ctx.regl.clear({ color: [0.102, 0.102, 0.102, 1], depth: 1 });
+			ctx.clear({ color: [0.102, 0.102, 0.102, 1], depth: 1 });
 
 			if (output && fv.width > 0 && fv.height > 0) {
 				blit({
@@ -121,16 +125,7 @@ function EffectCanvasInner({ className }: EffectCanvasProps) {
 		const blit = ctx.createScreenCommand({
 			vertexShader: passthroughVert,
 			fragmentShader: passthroughFrag,
-			uniforms: {
-				u_texture: ctx.regl.prop<{ u_texture: unknown }, "u_texture">(
-					"u_texture",
-				),
-				u_resolution: ctx.regl.prop<
-					{ u_resolution: [number, number] },
-					"u_resolution"
-				>("u_resolution"),
-				u_time: ctx.regl.prop<{ u_time: number }, "u_time">("u_time"),
-			},
+			uniforms: createPassthroughUniforms(ctx),
 		});
 		ctxRef.current = ctx;
 		rendererRef.current = renderer;
