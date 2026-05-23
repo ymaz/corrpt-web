@@ -1,20 +1,19 @@
-import * as THREE from "three";
+import type { DrawCommand, Framebuffer2D, Texture2D } from "regl";
 
 import { getEffect } from "@/effects/registry";
 import type { EffectDefinition, EffectInstance } from "@/effects/types";
+import type { ReglContext } from "@/engine/reglContext";
 
 export interface RenderChainParams {
-	gl: THREE.WebGLRenderer;
-	texture: THREE.Texture;
+	ctx: ReglContext;
+	texture: Texture2D;
 	effects: readonly EffectInstance[];
-	fbos: readonly [THREE.WebGLRenderTarget, THREE.WebGLRenderTarget];
-	offScreen: { scene: THREE.Scene; camera: THREE.Camera; mesh: THREE.Mesh };
-	materialCache: Map<string, THREE.ShaderMaterial>;
-	resolution: THREE.Vector2;
+	fbos: readonly [Framebuffer2D, Framebuffer2D];
+	commandCache: Map<string, DrawCommand>;
+	resolution: readonly [number, number];
 	time: number;
 }
 
-// Keyed by effectId; built once per definition, never rebuilt.
 const enumMapCache = new Map<string, Map<string, Map<string, number>>>();
 
 function getEnumMaps(def: EffectDefinition): Map<string, Map<string, number>> {
@@ -31,21 +30,35 @@ function getEnumMaps(def: EffectDefinition): Map<string, Map<string, number>> {
 	return maps;
 }
 
-/**
- * Runs the multi-pass FBO effect chain and returns the final output texture.
- * Pure rendering function — no React/R3F dependencies, callable from export code.
- */
-export function renderEffectChain(params: RenderChainParams): THREE.Texture {
-	const {
-		gl,
-		texture,
-		effects,
-		fbos,
-		offScreen,
-		materialCache,
-		resolution,
-		time,
-	} = params;
+function buildCommand(ctx: ReglContext, def: EffectDefinition): DrawCommand {
+	const uniforms: Record<string, unknown> = {
+		u_texture: ctx.regl.prop<
+			{ u_texture: Texture2D | Framebuffer2D },
+			"u_texture"
+		>("u_texture"),
+		u_resolution: ctx.regl.prop<
+			{ u_resolution: [number, number] },
+			"u_resolution"
+		>("u_resolution"),
+		u_time: ctx.regl.prop<{ u_time: number }, "u_time">("u_time"),
+	};
+	for (const p of def.parameters) {
+		const name = `u_${p.name}`;
+		uniforms[name] = ctx.regl.prop<Record<string, unknown>, string>(name);
+	}
+	return ctx.createEffectCommand({
+		vertexShader: def.vertexShader,
+		fragmentShader: def.fragmentShader,
+		uniforms,
+	});
+}
+
+/** Returns the input Texture2D if no effects ran, else the last Framebuffer2D. */
+export function renderEffectChain(
+	params: RenderChainParams,
+): Texture2D | Framebuffer2D {
+	const { ctx, texture, effects, fbos, commandCache, resolution, time } =
+		params;
 
 	let readIndex = 0;
 	let passCount = 0;
@@ -58,107 +71,74 @@ export function renderEffectChain(params: RenderChainParams): THREE.Texture {
 
 		const enumMaps = getEnumMaps(def);
 
-		// Get or create cached material
-		let mat = materialCache.get(effect.instanceId);
-		if (!mat) {
-			const uniforms: Record<string, THREE.IUniform> = {
-				u_texture: { value: null },
-				u_resolution: { value: new THREE.Vector2() },
-				u_time: { value: 0 },
-			};
-			for (const p of def.parameters) {
-				const uniformName = `u_${p.name}`;
+		let cmd = commandCache.get(effect.instanceId);
+		if (!cmd) {
+			cmd = buildCommand(ctx, def);
+			commandCache.set(effect.instanceId, cmd);
+		}
+
+		const inputTexture: Texture2D | Framebuffer2D =
+			passCount === 0 ? texture : fbos[readIndex];
+
+		const props: Record<string, unknown> = {
+			u_texture: inputTexture,
+			u_resolution: resolution,
+			u_time: time,
+		};
+		for (const p of def.parameters) {
+			const val = effect.parameters[p.name];
+			const name = `u_${p.name}`;
+			if (val === undefined) {
 				switch (p.type) {
 					case "bool":
-						uniforms[uniformName] = { value: p.default ? 1.0 : 0.0 };
+						props[name] = p.default ? 1.0 : 0.0;
 						break;
 					case "int":
 					case "float":
-						uniforms[uniformName] = { value: p.default };
+						props[name] = p.default;
 						break;
 					case "enum":
-						uniforms[uniformName] = {
-							value: enumMaps.get(p.name)?.get(p.default) ?? 0,
-						};
+						props[name] = enumMaps.get(p.name)?.get(p.default) ?? 0;
 						break;
 					case "vec2":
-						uniforms[uniformName] = {
-							value: new THREE.Vector2(p.default[0], p.default[1]),
-						};
+						props[name] = [p.default[0], p.default[1]];
 						break;
 					case "color":
-						uniforms[uniformName] = {
-							value: new THREE.Vector3(
-								p.default[0],
-								p.default[1],
-								p.default[2],
-							),
-						};
+						props[name] = [p.default[0], p.default[1], p.default[2]];
 						break;
 				}
+				continue;
 			}
-			mat = new THREE.ShaderMaterial({
-				vertexShader: def.vertexShader,
-				fragmentShader: def.fragmentShader,
-				uniforms,
-			});
-			materialCache.set(effect.instanceId, mat);
-		}
-
-		// First actual pass reads original texture; subsequent read previous FBO
-		const inputTexture = passCount === 0 ? texture : fbos[readIndex].texture;
-		mat.uniforms.u_texture.value = inputTexture;
-		mat.uniforms.u_resolution.value.copy(resolution);
-		mat.uniforms.u_time.value = time;
-
-		for (const p of def.parameters) {
-			const uniformName = `u_${p.name}`;
-			if (!(uniformName in mat.uniforms)) continue;
-			const val = effect.parameters[p.name];
-			if (val === undefined) continue;
-
 			switch (p.type) {
 				case "bool":
-					mat.uniforms[uniformName].value = val ? 1.0 : 0.0;
+					props[name] = val ? 1.0 : 0.0;
 					break;
 				case "int":
 				case "float":
-					mat.uniforms[uniformName].value = val;
+					props[name] = val;
 					break;
 				case "enum":
-					mat.uniforms[uniformName].value =
-						enumMaps.get(p.name)?.get(val as string) ?? 0;
+					props[name] = enumMaps.get(p.name)?.get(val as string) ?? 0;
 					break;
 				case "vec2": {
 					const v = val as [number, number];
-					(mat.uniforms[uniformName].value as THREE.Vector2).set(v[0], v[1]);
+					props[name] = [v[0], v[1]];
 					break;
 				}
 				case "color": {
 					const c = val as [number, number, number];
-					(mat.uniforms[uniformName].value as THREE.Vector3).set(
-						c[0],
-						c[1],
-						c[2],
-					);
+					props[name] = [c[0], c[1], c[2]];
 					break;
 				}
 			}
 		}
 
-		// Render to write FBO
 		const writeIndex = 1 - readIndex;
-		offScreen.mesh.material = mat;
-		gl.setRenderTarget(fbos[writeIndex]);
-		gl.render(offScreen.scene, offScreen.camera);
+		cmd({ ...props, framebuffer: fbos[writeIndex] });
 
-		// Swap for next pass
 		readIndex = writeIndex;
 		passCount++;
 	}
 
-	gl.setRenderTarget(null);
-
-	// Return final output texture (or original if all effects were skipped)
-	return passCount > 0 ? fbos[readIndex].texture : texture;
+	return passCount > 0 ? fbos[readIndex] : texture;
 }

@@ -35,8 +35,8 @@ function createEffectInstance(effectId: string): EffectInstance {
 
 export const MAX_EFFECT_INSTANCES = 3;
 
-// Module-level clock — written at 60fps by EffectPipeline, read at export time.
-// Kept outside Zustand so writes don't trigger the notification cycle.
+// Module-level clock — advanced per rendered frame by EffectCanvas, read at
+// export time. Kept outside Zustand so writes don't trigger the notification cycle.
 let _time = 0;
 export const getTime = (): number => _time;
 export const setTime = (t: number): void => {

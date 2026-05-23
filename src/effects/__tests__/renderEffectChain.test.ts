@@ -1,5 +1,7 @@
-import * as THREE from "three";
+import type { DrawCommand, Framebuffer2D, Texture2D } from "regl";
 import { describe, expect, it, vi } from "vitest";
+
+import type { ReglContext } from "@/engine/reglContext";
 import { registerEffect } from "../registry";
 import { renderEffectChain } from "../renderEffectChain";
 import type { EffectDefinition, EffectInstance } from "../types";
@@ -60,39 +62,52 @@ function makeInstance(overrides?: Partial<EffectInstance>): EffectInstance {
 	};
 }
 
+interface DrawCall {
+	framebuffer: Framebuffer2D;
+	props: Record<string, unknown>;
+}
+
 function setup(
 	effects: EffectInstance[] = [],
-	cache = new Map<string, THREE.ShaderMaterial>(),
+	cache = new Map<string, DrawCommand>(),
 ) {
-	const gl = {
-		setRenderTarget: vi.fn(),
-		render: vi.fn(),
-	} as unknown as THREE.WebGLRenderer;
-	const texture = {} as THREE.Texture;
-	const fboTextures = [{} as THREE.Texture, {} as THREE.Texture];
-	const fbos = [{ texture: fboTextures[0] }, { texture: fboTextures[1] }] as [
-		THREE.WebGLRenderTarget,
-		THREE.WebGLRenderTarget,
-	];
+	const calls: DrawCall[] = [];
+
+	const createEffectCommand = vi.fn((): DrawCommand => {
+		const cmd = vi.fn((props: Record<string, unknown>) => {
+			const { framebuffer, ...rest } = props;
+			calls.push({ framebuffer: framebuffer as Framebuffer2D, props: rest });
+		}) as unknown as DrawCommand;
+		return cmd;
+	});
+
+	const ctx = {
+		regl: {
+			prop: (name: string) => name,
+		},
+		createEffectCommand,
+	} as unknown as ReglContext;
+
+	const texture = { __id: "tex" } as unknown as Texture2D;
+	const fbos = [
+		{ __id: "fbo0" } as unknown as Framebuffer2D,
+		{ __id: "fbo1" } as unknown as Framebuffer2D,
+	] as [Framebuffer2D, Framebuffer2D];
 
 	return {
 		params: {
-			gl,
+			ctx,
 			texture,
 			effects,
 			fbos,
-			offScreen: {
-				scene: {} as THREE.Scene,
-				camera: {} as THREE.Camera,
-				mesh: { material: null } as unknown as THREE.Mesh,
-			},
-			materialCache: cache,
-			resolution: new THREE.Vector2(100, 100),
+			commandCache: cache,
+			resolution: [100, 100] as [number, number],
 			time: 1.5,
 		},
-		gl,
+		ctx,
+		createEffectCommand,
+		calls,
 		texture,
-		fboTextures,
 		fbos,
 		cache,
 	};
@@ -112,125 +127,104 @@ describe("renderEffectChain", () => {
 		expect(renderEffectChain(params)).toBe(texture);
 	});
 
-	it("always restores default render target via setRenderTarget(null)", () => {
-		const { params, gl } = setup([]);
-		renderEffectChain(params);
-		expect(gl.setRenderTarget).toHaveBeenCalledWith(null);
-	});
-
-	it("calls gl.render once per enabled effect", () => {
-		const { params, gl } = setup([
+	it("invokes the draw command once per enabled effect", () => {
+		const { params, calls } = setup([
 			makeInstance(),
 			makeInstance({ instanceId: "rc-i2" }),
 		]);
 		renderEffectChain(params);
-		expect(gl.render).toHaveBeenCalledTimes(2);
+		expect(calls).toHaveLength(2);
 	});
 
-	it("single effect: writes to fbos[1] and returns fbos[1].texture", () => {
-		const { params, fbos, fboTextures } = setup([makeInstance()]);
+	it("single effect: writes to fbos[1] and returns fbos[1]", () => {
+		const { params, fbos, calls } = setup([makeInstance()]);
 		const result = renderEffectChain(params);
-		expect(params.gl.setRenderTarget).toHaveBeenCalledWith(fbos[1]);
-		expect(result).toBe(fboTextures[1]);
+		expect(calls[0].framebuffer).toBe(fbos[1]);
+		expect(result).toBe(fbos[1]);
 	});
 
-	it("two effects: ping-pongs fbos and returns fbos[0].texture", () => {
-		const { params, fbos, fboTextures } = setup([
+	it("two effects: ping-pongs fbos and returns fbos[0]", () => {
+		const { params, fbos, calls } = setup([
 			makeInstance(),
 			makeInstance({ instanceId: "rc-i2" }),
 		]);
 		const result = renderEffectChain(params);
-		expect(params.gl.setRenderTarget).toHaveBeenNthCalledWith(1, fbos[1]);
-		expect(params.gl.setRenderTarget).toHaveBeenNthCalledWith(2, fbos[0]);
-		expect(result).toBe(fboTextures[0]);
+		expect(calls[0].framebuffer).toBe(fbos[1]);
+		expect(calls[1].framebuffer).toBe(fbos[0]);
+		expect(result).toBe(fbos[0]);
 	});
 
-	it("creates a ShaderMaterial and stores it in materialCache", () => {
-		const cache = new Map<string, THREE.ShaderMaterial>();
+	it("creates a DrawCommand and stores it in commandCache", () => {
+		const cache = new Map<string, DrawCommand>();
 		const { params } = setup(
 			[makeInstance({ instanceId: "rc-cache-1" })],
 			cache,
 		);
 		renderEffectChain(params);
-		expect(cache.get("rc-cache-1")).toBeInstanceOf(THREE.ShaderMaterial);
+		expect(cache.has("rc-cache-1")).toBe(true);
 	});
 
-	it("reuses cached material on subsequent calls", () => {
-		const cache = new Map<string, THREE.ShaderMaterial>();
-		const { params } = setup(
+	it("reuses cached command on subsequent calls", () => {
+		const cache = new Map<string, DrawCommand>();
+		const { params, createEffectCommand } = setup(
 			[makeInstance({ instanceId: "rc-reuse-1" })],
 			cache,
 		);
 		renderEffectChain(params);
-		const mat = cache.get("rc-reuse-1");
+		const cmd = cache.get("rc-reuse-1");
 		renderEffectChain(params);
 		expect(cache.size).toBe(1);
-		expect(cache.get("rc-reuse-1")).toBe(mat);
+		expect(cache.get("rc-reuse-1")).toBe(cmd);
+		expect(createEffectCommand).toHaveBeenCalledTimes(1);
 	});
 
-	it("updates float uniform from instance parameters", () => {
-		const cache = new Map<string, THREE.ShaderMaterial>();
-		const { params } = setup(
-			[
-				makeInstance({
-					instanceId: "rc-float-1",
-					parameters: { intensity: 0.8, active: false },
-				}),
-			],
-			cache,
-		);
+	it("passes the float instance parameter as a uniform prop", () => {
+		const { params, calls } = setup([
+			makeInstance({
+				instanceId: "rc-float-1",
+				parameters: { intensity: 0.8, active: false },
+			}),
+		]);
 		renderEffectChain(params);
-		expect(cache.get("rc-float-1")!.uniforms.u_intensity.value).toBe(0.8);
+		expect(calls[0].props.u_intensity).toBe(0.8);
 	});
 
-	it("maps bool parameter true → 1.0 in uniforms", () => {
-		const cache = new Map<string, THREE.ShaderMaterial>();
-		const { params } = setup(
-			[
-				makeInstance({
-					instanceId: "rc-bool-t",
-					parameters: { intensity: 0.5, active: true },
-				}),
-			],
-			cache,
-		);
+	it("maps bool parameter true → 1.0", () => {
+		const { params, calls } = setup([
+			makeInstance({
+				instanceId: "rc-bool-t",
+				parameters: { intensity: 0.5, active: true },
+			}),
+		]);
 		renderEffectChain(params);
-		expect(cache.get("rc-bool-t")!.uniforms.u_active.value).toBe(1.0);
+		expect(calls[0].props.u_active).toBe(1.0);
 	});
 
-	it("maps bool parameter false → 0.0 in uniforms", () => {
-		const cache = new Map<string, THREE.ShaderMaterial>();
-		const { params } = setup(
-			[
-				makeInstance({
-					instanceId: "rc-bool-f",
-					parameters: { intensity: 0.5, active: false },
-				}),
-			],
-			cache,
-		);
+	it("maps bool parameter false → 0.0", () => {
+		const { params, calls } = setup([
+			makeInstance({
+				instanceId: "rc-bool-f",
+				parameters: { intensity: 0.5, active: false },
+			}),
+		]);
 		renderEffectChain(params);
-		expect(cache.get("rc-bool-f")!.uniforms.u_active.value).toBe(0.0);
+		expect(calls[0].props.u_active).toBe(0.0);
 	});
 
-	it("sets u_time uniform from the time param", () => {
-		const cache = new Map<string, THREE.ShaderMaterial>();
-		const { params } = setup(
-			[makeInstance({ instanceId: "rc-time-1" })],
-			cache,
-		);
+	it("passes the time parameter as u_time", () => {
+		const { params, calls } = setup([
+			makeInstance({ instanceId: "rc-time-1" }),
+		]);
 		renderEffectChain(params);
-		expect(cache.get("rc-time-1")!.uniforms.u_time.value).toBe(1.5);
+		expect(calls[0].props.u_time).toBe(1.5);
 	});
 
-	it("sets u_texture to original texture on the first pass", () => {
-		const cache = new Map<string, THREE.ShaderMaterial>();
-		const { params, texture } = setup(
-			[makeInstance({ instanceId: "rc-tex-1" })],
-			cache,
-		);
+	it("uses original texture as u_texture on the first pass", () => {
+		const { params, texture, calls } = setup([
+			makeInstance({ instanceId: "rc-tex-1" }),
+		]);
 		renderEffectChain(params);
-		expect(cache.get("rc-tex-1")!.uniforms.u_texture.value).toBe(texture);
+		expect(calls[0].props.u_texture).toBe(texture);
 	});
 
 	it("passthrough: silently skips effects with unknown effectId", () => {
@@ -240,54 +234,42 @@ describe("renderEffectChain", () => {
 		expect(renderEffectChain(params)).toBe(texture);
 	});
 
-	it("maps enum default value to its option index on material init", () => {
-		const cache = new Map<string, THREE.ShaderMaterial>();
-		const { params } = setup(
-			[
-				{
-					instanceId: "rc-enum-init",
-					effectId: RC_ENUM_EFFECT_ID,
-					enabled: true,
-					parameters: { mode: "b" },
-				},
-			],
-			cache,
-		);
+	it("maps enum default value to its option index", () => {
+		const { params, calls } = setup([
+			{
+				instanceId: "rc-enum-init",
+				effectId: RC_ENUM_EFFECT_ID,
+				enabled: true,
+				parameters: { mode: "b" },
+			},
+		]);
 		renderEffectChain(params);
-		expect(cache.get("rc-enum-init")!.uniforms.u_mode.value).toBe(1);
+		expect(calls[0].props.u_mode).toBe(1);
 	});
 
 	it("maps enum instance parameter to its option index", () => {
-		const cache = new Map<string, THREE.ShaderMaterial>();
-		const { params } = setup(
-			[
-				{
-					instanceId: "rc-enum-update",
-					effectId: RC_ENUM_EFFECT_ID,
-					enabled: true,
-					parameters: { mode: "c" },
-				},
-			],
-			cache,
-		);
+		const { params, calls } = setup([
+			{
+				instanceId: "rc-enum-update",
+				effectId: RC_ENUM_EFFECT_ID,
+				enabled: true,
+				parameters: { mode: "c" },
+			},
+		]);
 		renderEffectChain(params);
-		expect(cache.get("rc-enum-update")!.uniforms.u_mode.value).toBe(2);
+		expect(calls[0].props.u_mode).toBe(2);
 	});
 
 	it("falls back to 0 for an unknown enum value", () => {
-		const cache = new Map<string, THREE.ShaderMaterial>();
-		const { params } = setup(
-			[
-				{
-					instanceId: "rc-enum-unknown",
-					effectId: RC_ENUM_EFFECT_ID,
-					enabled: true,
-					parameters: { mode: "unknown" },
-				},
-			],
-			cache,
-		);
+		const { params, calls } = setup([
+			{
+				instanceId: "rc-enum-unknown",
+				effectId: RC_ENUM_EFFECT_ID,
+				enabled: true,
+				parameters: { mode: "unknown" },
+			},
+		]);
 		renderEffectChain(params);
-		expect(cache.get("rc-enum-unknown")!.uniforms.u_mode.value).toBe(0);
+		expect(calls[0].props.u_mode).toBe(0);
 	});
 });

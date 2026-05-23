@@ -16,7 +16,7 @@ describe("imageStore", () => {
 			revokeObjectURL: vi.fn(),
 		});
 		useImageStore.setState({
-			texture: null,
+			bitmap: null,
 			dimensions: null,
 			originalUrl: null,
 			fileName: null,
@@ -34,23 +34,12 @@ describe("imageStore", () => {
 		delete u.revokeObjectURL;
 	});
 
-	it("sets texture.flipY to false — Three.js skips UNPACK_FLIP_Y_WEBGL for ImageBitmap sources", async () => {
-		const file = new File(["x"], "photo.jpg", { type: "image/jpeg" });
-		useImageStore.getState().loadImage(file);
-
-		await vi.waitFor(() =>
-			expect(useImageStore.getState().texture).not.toBeNull(),
-		);
-
-		expect(useImageStore.getState().texture?.flipY).toBe(false);
-	});
-
 	it("pre-flips the bitmap with imageOrientation: flipY so UV (0,0) reads the bottom of the image", async () => {
 		const file = new File(["x"], "photo.jpg", { type: "image/jpeg" });
 		useImageStore.getState().loadImage(file);
 
 		await vi.waitFor(() =>
-			expect(useImageStore.getState().texture).not.toBeNull(),
+			expect(useImageStore.getState().bitmap).not.toBeNull(),
 		);
 
 		const hasFlipYCall = (
@@ -64,9 +53,9 @@ describe("imageStore", () => {
 			.getState()
 			.loadImage(new File(["x"], "photo.jpg", { type: "image/jpeg" }));
 		await vi.waitFor(() =>
-			expect(useImageStore.getState().texture).not.toBeNull(),
+			expect(useImageStore.getState().bitmap).not.toBeNull(),
 		);
-		return useImageStore.getState().texture!.image as unknown as {
+		return useImageStore.getState().bitmap as unknown as {
 			close: ReturnType<typeof vi.fn>;
 		};
 	}
@@ -94,7 +83,7 @@ describe("imageStore", () => {
 		useImageStore.getState().loadImage(file);
 
 		await vi.waitFor(() =>
-			expect(useImageStore.getState().texture).not.toBeNull(),
+			expect(useImageStore.getState().bitmap).not.toBeNull(),
 		);
 
 		const calls = createImageBitmapMock.mock.calls as [

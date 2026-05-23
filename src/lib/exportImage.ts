@@ -1,17 +1,14 @@
-import * as THREE from "three";
+import type { DrawCommand } from "regl";
 
 import { renderEffectChain } from "@/effects/renderEffectChain";
 import passthroughFrag from "@/effects/shaders/common/passthrough.frag";
 import passthroughVert from "@/effects/shaders/common/passthrough.vert";
 import type { EffectInstance } from "@/effects/types";
-import {
-	EXPORT_RENDERER_SETTINGS,
-	LOSSY_EXPORT_QUALITY,
-	MIME_TO_EXT,
-} from "@/lib/constants";
+import { createReglContext } from "@/engine/reglContext";
+import { LOSSY_EXPORT_QUALITY, MIME_TO_EXT } from "@/lib/constants";
 
 export interface ExportOptions {
-	texture: THREE.Texture;
+	bitmap: ImageBitmap;
 	dimensions: { width: number; height: number };
 	effects: readonly EffectInstance[];
 	mimeType: string;
@@ -21,88 +18,77 @@ export interface ExportOptions {
 
 /**
  * Exports the current image with all active effects applied at full resolution.
- * Creates off-screen renderer, processes effects, and triggers download.
+ * Creates a dedicated off-screen regl context so the preview pipeline is
+ * untouched, then runs the same effect chain against full-resolution FBOs.
  */
 export function exportImage(options: ExportOptions): Promise<void> {
-	const { texture, dimensions, effects, mimeType, fileName, time } = options;
+	const { bitmap, dimensions, effects, mimeType, fileName, time } = options;
 	const { width, height } = dimensions;
 
-	// Create off-screen canvas and renderer
 	const canvas = document.createElement("canvas");
 	canvas.width = width;
 	canvas.height = height;
 
-	const renderer = new THREE.WebGLRenderer({
-		canvas,
-		...EXPORT_RENDERER_SETTINGS,
+	// preserveDrawingBuffer: WebGL may clear the drawing buffer after
+	// compositing; toBlob is async and reads pixels after the frame, so
+	// the buffer must survive until the callback fires.
+	const ctx = createReglContext(canvas, { preserveDrawingBuffer: true });
+
+	const texture = ctx.createImageTexture(bitmap);
+	const fbos = [
+		ctx.createFramebuffer(width, height),
+		ctx.createFramebuffer(width, height),
+	] as const;
+
+	const commandCache = new Map<string, DrawCommand>();
+
+	const blit = ctx.createScreenCommand({
+		vertexShader: passthroughVert,
+		fragmentShader: passthroughFrag,
+		uniforms: {
+			u_texture: ctx.regl.prop<{ u_texture: unknown }, "u_texture">(
+				"u_texture",
+			),
+			u_resolution: ctx.regl.prop<
+				{ u_resolution: [number, number] },
+				"u_resolution"
+			>("u_resolution"),
+			u_time: ctx.regl.prop<{ u_time: number }, "u_time">("u_time"),
+		},
 	});
-	renderer.setSize(width, height, false);
 
-	// Create FBOs at full resolution
-	const fboOptions = {
-		minFilter: THREE.LinearFilter,
-		magFilter: THREE.LinearFilter,
-		format: THREE.RGBAFormat,
-		type: THREE.UnsignedByteType,
-	};
-	const fbo0 = new THREE.WebGLRenderTarget(width, height, fboOptions);
-	const fbo1 = new THREE.WebGLRenderTarget(width, height, fboOptions);
-	const fbos = [fbo0, fbo1] as const;
-
-	// Create off-screen scene with orthographic camera
-	const scene = new THREE.Scene();
-	const camera = new THREE.OrthographicCamera(-0.5, 0.5, 0.5, -0.5, 0.1, 10);
-	camera.position.z = 1;
-
-	// Unit plane geometry
-	const geometry = new THREE.PlaneGeometry(1, 1);
-	const mesh = new THREE.Mesh(geometry);
-	scene.add(mesh);
-
-	const materialCache = new Map<string, THREE.ShaderMaterial>();
-
-	let displayMaterial: THREE.ShaderMaterial | undefined;
+	// Idempotent: a late toBlob callback can fire after the timeout has already
+	// torn things down, and destroying regl handles twice throws.
+	let cleaned = false;
 	const cleanup = () => {
-		geometry.dispose();
-		displayMaterial?.dispose();
-		for (const mat of materialCache.values()) {
-			mat.dispose();
-		}
-		fbo0.dispose();
-		fbo1.dispose();
-		renderer.dispose();
+		if (cleaned) return;
+		cleaned = true;
+		texture.destroy();
+		fbos[0].destroy();
+		fbos[1].destroy();
+		ctx.destroy();
 	};
 
 	const ext = MIME_TO_EXT[mimeType] || "png";
 	const quality = mimeType === "image/png" ? undefined : LOSSY_EXPORT_QUALITY;
 
-	const resolution = new THREE.Vector2(width, height);
-
 	try {
-		const finalTexture = renderEffectChain({
-			gl: renderer,
+		const finalTarget = renderEffectChain({
+			ctx,
 			texture,
 			effects,
 			fbos,
-			offScreen: { scene, camera, mesh },
-			materialCache,
-			resolution,
+			commandCache,
+			resolution: [width, height],
 			time,
 		});
 
-		displayMaterial = new THREE.ShaderMaterial({
-			vertexShader: passthroughVert,
-			fragmentShader: passthroughFrag,
-			uniforms: {
-				u_texture: { value: finalTexture },
-				u_resolution: { value: resolution },
-				u_time: { value: 0 },
-			},
+		blit({
+			u_texture: finalTarget,
+			u_resolution: [width, height],
+			u_time: 0,
+			viewport: { x: 0, y: 0, width, height },
 		});
-
-		mesh.material = displayMaterial;
-		renderer.setRenderTarget(null);
-		renderer.render(scene, camera);
 	} catch (error) {
 		cleanup();
 		return Promise.reject(error);

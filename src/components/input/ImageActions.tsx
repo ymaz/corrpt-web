@@ -20,7 +20,7 @@ export function ImageActions() {
 	const [exportError, setExportError] = useState<string | null>(null);
 
 	const {
-		texture,
+		bitmap,
 		dimensions,
 		fileName,
 		mimeType,
@@ -30,7 +30,7 @@ export function ImageActions() {
 		loadImage,
 	} = useImageStore(
 		useShallow((s) => ({
-			texture: s.texture,
+			bitmap: s.bitmap,
 			dimensions: s.dimensions,
 			fileName: s.fileName,
 			mimeType: s.mimeType,
@@ -61,7 +61,7 @@ export function ImageActions() {
 	);
 
 	const handleDownload = useCallback(() => {
-		if (!texture || !dimensions || !fileName || !mimeType) return;
+		if (!bitmap || !dimensions || !fileName || !mimeType) return;
 
 		setExportError(null);
 		setIsExporting(true);
@@ -70,7 +70,7 @@ export function ImageActions() {
 		setTimeout(async () => {
 			try {
 				await exportImage({
-					texture,
+					bitmap,
 					dimensions,
 					effects,
 					mimeType,
@@ -84,9 +84,9 @@ export function ImageActions() {
 				setIsExporting(false);
 			}
 		}, 0);
-	}, [texture, dimensions, fileName, mimeType, effects]);
+	}, [bitmap, dimensions, fileName, mimeType, effects]);
 
-	if (!texture) return null;
+	if (!bitmap) return null;
 
 	return (
 		<div className="absolute top-4 left-4 z-10 flex flex-col items-start gap-2">
