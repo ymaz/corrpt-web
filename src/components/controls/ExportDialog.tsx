@@ -74,6 +74,7 @@ export function ExportDialog() {
 					mimeType: format,
 					fileName,
 					time,
+					quality: isLossy(format) ? quality : undefined,
 				});
 				setIsExporting(false);
 				closeModal();
@@ -82,7 +83,7 @@ export function ExportDialog() {
 				setError("Failed to export image. Try again.");
 			}
 		}, 0);
-	}, [bitmap, dimensions, fileName, effects, format, closeModal]);
+	}, [bitmap, dimensions, fileName, effects, format, quality, closeModal]);
 
 	return (
 		<Dialog.Root
