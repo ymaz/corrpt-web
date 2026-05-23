@@ -57,7 +57,12 @@ export function exportImage(options: ExportOptions): Promise<void> {
 		},
 	});
 
+	// Idempotent: a late toBlob callback can fire after the timeout has already
+	// torn things down, and destroying regl handles twice throws.
+	let cleaned = false;
 	const cleanup = () => {
+		if (cleaned) return;
+		cleaned = true;
 		texture.destroy();
 		fbos[0].destroy();
 		fbos[1].destroy();

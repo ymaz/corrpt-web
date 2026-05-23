@@ -64,8 +64,13 @@ test.describe("visual", () => {
 		await page.goto("/");
 		await uploadViaLanding(page, testImage);
 		await expect(page.getByTestId(EFFECT_DEV_PANEL)).toBeVisible();
-		// One RAF + a small buffer for the ResizeObserver-driven sync.
-		await page.waitForTimeout(200);
+		// Wait for the first real frame instead of a fixed delay: the center
+		// pixel leaves the background color once the image has rendered.
+		await expect
+			.poll(async () => isBackground((await samplePixels(page)).center), {
+				timeout: 5_000,
+			})
+			.toBe(false);
 	});
 
 	test("image renders with real content — non-background and non-uniform across the canvas", async ({
@@ -101,8 +106,23 @@ test.describe("visual", () => {
 		// the effect renders to the canvas directly and the final blit samples
 		// empty FBOs, producing a uniform white surface. The variance check
 		// catches that regression class.
+		const before = await samplePixels(page);
 		await page.getByTestId(effectToggle("rgbShift")).check();
-		await page.waitForTimeout(200);
+		// Wait until the toggle has actually re-rendered: rgbShift offsets the R/B
+		// channels horizontally, so the gradient samples shift measurably.
+		await expect
+			.poll(
+				async () => {
+					const cur = await samplePixels(page);
+					return (
+						maxChannelDelta(cur.center, before.center) > COLOR_TOL ||
+						maxChannelDelta(cur.left, before.left) > COLOR_TOL ||
+						maxChannelDelta(cur.right, before.right) > COLOR_TOL
+					);
+				},
+				{ timeout: 5_000 },
+			)
+			.toBe(true);
 
 		const px = await samplePixels(page);
 		expect(isBackground(px.center)).toBe(false);

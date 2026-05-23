@@ -136,32 +136,10 @@ function EffectCanvasInner({ className }: EffectCanvasProps) {
 		rendererRef.current = renderer;
 		blitRef.current = blit;
 
-		const imageState = useImageStore.getState();
-		const effectState = useEffectStore.getState();
-		renderer.setImage(imageState.bitmap);
-		renderer.setEffects(effectState.effects);
-		invalidate();
-
-		return () => {
-			if (frameRequestRef.current !== null) {
-				cancelAnimationFrame(frameRequestRef.current);
-				frameRequestRef.current = null;
-			}
-			renderer.dispose();
-			ctx.destroy();
-			ctxRef.current = null;
-			rendererRef.current = null;
-			blitRef.current = null;
-		};
-	}, [invalidate]);
-
-	useEffect(() => {
-		const canvas = canvasRef.current;
-		if (!canvas) return;
+		renderer.setImage(useImageStore.getState().bitmap);
+		renderer.setEffects(useEffectStore.getState().effects);
 
 		const sync = () => {
-			const renderer = rendererRef.current;
-			if (!renderer) return;
 			const { bitmap, dimensions } = useImageStore.getState();
 			if (!bitmap || !dimensions) {
 				fittedViewportRef.current = { x: 0, y: 0, width: 0, height: 0 };
@@ -194,19 +172,21 @@ function EffectCanvasInner({ className }: EffectCanvasProps) {
 			invalidate();
 		};
 
+		// Size the FBOs and viewport before the first frame so the initial
+		// render draws content, not a black flash.
 		sync();
 		const ro = new ResizeObserver(sync);
 		ro.observe(canvas);
 
 		const unsubImage = useImageStore.subscribe((state, prev) => {
 			if (state.bitmap !== prev.bitmap) {
-				rendererRef.current?.setImage(state.bitmap);
+				renderer.setImage(state.bitmap);
 				sync();
 			}
 		});
 		const unsubEffects = useEffectStore.subscribe((state, prev) => {
 			if (state.effects !== prev.effects) {
-				rendererRef.current?.setEffects(state.effects);
+				renderer.setEffects(state.effects);
 				invalidate();
 			}
 		});
@@ -215,6 +195,15 @@ function EffectCanvasInner({ className }: EffectCanvasProps) {
 			ro.disconnect();
 			unsubImage();
 			unsubEffects();
+			if (frameRequestRef.current !== null) {
+				cancelAnimationFrame(frameRequestRef.current);
+				frameRequestRef.current = null;
+			}
+			renderer.dispose();
+			ctx.destroy();
+			ctxRef.current = null;
+			rendererRef.current = null;
+			blitRef.current = null;
 		};
 	}, [invalidate]);
 

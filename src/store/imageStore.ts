@@ -9,7 +9,6 @@ import {
 import type { ImageStore } from "@/store/types";
 
 let loadGeneration = 0;
-let currentBitmap: ImageBitmap | null = null;
 
 export const useImageStore = create<ImageStore>((set, get) => ({
 	bitmap: null,
@@ -22,10 +21,9 @@ export const useImageStore = create<ImageStore>((set, get) => ({
 	warning: null,
 
 	clearImage: () => {
-		const { originalUrl } = get();
-		if (currentBitmap) {
-			currentBitmap.close();
-			currentBitmap = null;
+		const { bitmap, originalUrl } = get();
+		if (bitmap) {
+			bitmap.close();
 		}
 		if (originalUrl) {
 			URL.revokeObjectURL(originalUrl);
@@ -129,8 +127,6 @@ export const useImageStore = create<ImageStore>((set, get) => ({
 					URL.revokeObjectURL(objectUrl);
 					return;
 				}
-
-				currentBitmap = finalBitmap;
 
 				set({
 					bitmap: finalBitmap,
