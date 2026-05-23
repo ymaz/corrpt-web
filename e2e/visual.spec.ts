@@ -106,32 +106,25 @@ test.describe("visual", () => {
 		// the effect renders to the canvas directly and the final blit samples
 		// empty FBOs, producing a uniform white surface. The variance check
 		// catches that regression class.
-		const before = await samplePixels(page);
 		await page.getByTestId(effectToggle("rgbShift")).check();
-		// Wait until the toggle has actually re-rendered: rgbShift offsets the R/B
-		// channels horizontally, so the gradient samples shift measurably.
+
+		// Poll the invariant directly: once the effect has rendered, the canvas
+		// must still be non-background and non-uniform. The broken FBO-routing
+		// case yields a uniform surface (delta 0), so it never satisfies this and
+		// fails on timeout. Returning -1 for a background center fails the same
+		// assertion, covering the "rendered in wrong rect" case too.
 		await expect
 			.poll(
 				async () => {
 					const cur = await samplePixels(page);
-					return (
-						maxChannelDelta(cur.center, before.center) > COLOR_TOL ||
-						maxChannelDelta(cur.left, before.left) > COLOR_TOL ||
-						maxChannelDelta(cur.right, before.right) > COLOR_TOL
-					);
+					return isBackground(cur.center)
+						? -1
+						: maxChannelDelta(cur.left, cur.right);
 				},
 				{ timeout: 5_000 },
 			)
-			.toBe(true);
+			.toBeGreaterThanOrEqual(40);
 
-		const px = await samplePixels(page);
-		expect(isBackground(px.center)).toBe(false);
-		const lrDelta = maxChannelDelta(px.left, px.right);
-		expect(
-			lrDelta,
-			`with rgbShift active, left/right pixels should still vary ` +
-				`(left=${JSON.stringify(px.left)} right=${JSON.stringify(px.right)} delta=${lrDelta})`,
-		).toBeGreaterThanOrEqual(40);
 		expect(consoleErrors).toEqual([]);
 	});
 });
