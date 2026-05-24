@@ -167,17 +167,15 @@ function EffectCanvasInner({ className }: EffectCanvasProps) {
 			invalidate();
 		};
 
-		// Size the FBOs and viewport before the first frame so the initial
-		// render draws content, not a black flash.
-		sync();
 		const ro = new ResizeObserver(sync);
 		ro.observe(canvas);
 
-		// A ResizeObserver doesn't fire when only the device pixel ratio changes
-		// (e.g. dragging the window to a display with a different DPR), which would
-		// leave the canvas backing store at the old resolution and blur the
-		// preview. Watch DPR with a resolution media query, re-syncing and
-		// re-arming on each change since the query is pinned to one ratio.
+		// Size the FBOs/viewport before the first frame (so the initial render
+		// draws content, not a black flash) and keep them correct when only the
+		// device pixel ratio changes — e.g. dragging the window to a display with a
+		// different DPR, which a ResizeObserver misses and which would otherwise
+		// leave the backing store at the old resolution and blur the preview. The
+		// resolution query is pinned to one ratio, so re-sync and re-arm on change.
 		let dprQuery: MediaQueryList | null = null;
 		const handleDprChange = () => {
 			dprQuery?.removeEventListener("change", handleDprChange);
