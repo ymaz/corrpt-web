@@ -2,7 +2,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { DOWNLOAD_BUTTON, effectToggle } from "../src/lib/test-ids";
-import { expect, test, uploadViaLanding } from "./fixtures";
+import {
+	activateMultiPassAuxFixture,
+	expect,
+	test,
+	uploadViaLanding,
+} from "./fixtures";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const testImage = path.resolve(__dirname, "test-200x100.png");
@@ -30,6 +35,22 @@ test.describe("export", () => {
 		consoleErrors,
 	}) => {
 		await page.getByTestId(effectToggle("rgbShift")).check();
+
+		const downloadPromise = page.waitForEvent("download");
+		await page.getByTestId(DOWNLOAD_BUTTON).click();
+		const download = await downloadPromise;
+
+		expect(await download.failure()).toBeNull();
+		expect(consoleErrors).toEqual([]);
+	});
+
+	// A multi-pass effect forces the export path to allocate scratch framebuffers
+	// in its dedicated off-screen context — exercise that end to end.
+	test("download with a multi-pass effect triggers file download without errors", async ({
+		page,
+		consoleErrors,
+	}) => {
+		await activateMultiPassAuxFixture(page);
 
 		const downloadPromise = page.waitForEvent("download");
 		await page.getByTestId(DOWNLOAD_BUTTON).click();

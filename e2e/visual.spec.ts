@@ -4,7 +4,12 @@ import { fileURLToPath } from "node:url";
 import { PNG } from "pngjs";
 
 import { EFFECT_DEV_PANEL, effectToggle } from "../src/lib/test-ids";
-import { expect, test, uploadViaLanding } from "./fixtures";
+import {
+	activateMultiPassAuxFixture,
+	expect,
+	test,
+	uploadViaLanding,
+} from "./fixtures";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const testImage = path.resolve(__dirname, "test-200x100.png");
@@ -124,6 +129,33 @@ test.describe("visual", () => {
 				{ timeout: 5_000 },
 			)
 			.toBeGreaterThanOrEqual(40);
+
+		expect(consoleErrors).toEqual([]);
+	});
+
+	// The multi-pass (scratch-FBO ping-pong + u_source) and aux-texture
+	// (createDataTexture) engine paths have no shipped effect, so a test fixture
+	// drives them through real WebGL — coverage the mocked unit tests can't give.
+	// A broken FBO/LUT/u_source binding yields a uniform surface (delta 0), which
+	// the variance check catches; the threshold is conservative since the fixture
+	// blends a LUT remap with the source.
+	test("multi-pass + aux-texture fixture produces real, non-uniform output", async ({
+		page,
+		consoleErrors,
+	}) => {
+		await activateMultiPassAuxFixture(page);
+
+		await expect
+			.poll(
+				async () => {
+					const cur = await samplePixels(page);
+					return isBackground(cur.center)
+						? -1
+						: maxChannelDelta(cur.left, cur.right);
+				},
+				{ timeout: 5_000 },
+			)
+			.toBeGreaterThanOrEqual(20);
 
 		expect(consoleErrors).toEqual([]);
 	});

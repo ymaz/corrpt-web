@@ -1,6 +1,10 @@
 import type { Framebuffer2D, Texture2D } from "regl";
 
-import { renderEffectChain } from "@/effects/renderEffectChain";
+import {
+	type CachedEffect,
+	chainNeedsScratch,
+	renderEffectChain,
+} from "@/effects/renderEffectChain";
 import type { EffectInstance } from "@/effects/types";
 import type { ReglContext } from "@/engine/reglContext";
 
@@ -47,6 +51,8 @@ export function createEffectChainRenderer({
 	let texture: Texture2D | null = null;
 	let effects: readonly EffectInstance[] = [];
 	let fbos: readonly [Framebuffer2D, Framebuffer2D] | null = null;
+	// Allocated lazily only when the chain contains a multi-pass effect.
+	let scratchFbos: readonly [Framebuffer2D, Framebuffer2D] | null = null;
 	let width = 0;
 	let height = 0;
 	let disposed = false;
@@ -54,16 +60,26 @@ export function createEffectChainRenderer({
 	// Cache keyed by effectId — collapses to N entries where N = distinct effect
 	// types. Upper bound: |registered effects|. regl has no DrawCommand.destroy;
 	// commands are reclaimed only with the context.
-	const commandCache = new Map<
-		string,
-		{ cmd: import("regl").DrawCommand; props: Record<string, unknown> }
-	>();
+	const commandCache = new Map<string, CachedEffect>();
+	// Aux textures keyed `${effectId}:${name}`, owned here and disposed on teardown.
+	const auxTextureCache = new Map<string, Texture2D>();
 
 	const disposeFramebuffers = () => {
-		if (!fbos) return;
-		fbos[0].destroy();
-		fbos[1].destroy();
-		fbos = null;
+		if (fbos) {
+			fbos[0].destroy();
+			fbos[1].destroy();
+			fbos = null;
+		}
+		if (scratchFbos) {
+			scratchFbos[0].destroy();
+			scratchFbos[1].destroy();
+			scratchFbos = null;
+		}
+	};
+
+	const disposeAuxTextures = () => {
+		for (const tex of auxTextureCache.values()) tex.destroy();
+		auxTextureCache.clear();
 	};
 
 	const disposeTexture = () => {
@@ -77,6 +93,13 @@ export function createEffectChainRenderer({
 		for (const id of commandCache.keys()) {
 			if (!activeSet.has(id)) {
 				commandCache.delete(id);
+			}
+		}
+		for (const key of auxTextureCache.keys()) {
+			const effectId = key.slice(0, key.indexOf(":"));
+			if (!activeSet.has(effectId)) {
+				auxTextureCache.get(key)?.destroy();
+				auxTextureCache.delete(key);
 			}
 		}
 	};
@@ -120,13 +143,18 @@ export function createEffectChainRenderer({
 			if (!fbos) {
 				fbos = createFramebufferPair(ctx, width, height);
 			}
+			if (!scratchFbos && chainNeedsScratch(effects)) {
+				scratchFbos = createFramebufferPair(ctx, width, height);
+			}
 
 			return renderEffectChain({
 				ctx,
 				texture,
 				effects,
 				fbos,
+				scratchFbos,
 				commandCache,
+				auxTextureCache,
 				resolution: [width, height],
 				time,
 			});
@@ -137,6 +165,7 @@ export function createEffectChainRenderer({
 			disposed = true;
 			disposeFramebuffers();
 			disposeTexture();
+			disposeAuxTextures();
 			commandCache.clear();
 		},
 	};
