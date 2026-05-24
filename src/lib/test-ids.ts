@@ -9,6 +9,9 @@ export const DOWNLOAD_BUTTON = "download-button";
 export const IMAGE_ERROR = "image-error";
 export const IMAGE_WARNING = "image-warning";
 
+// Canvas
+export const CANVAS_ERROR = "canvas-error";
+
 // Effects panel
 export const EFFECT_DEV_PANEL = "effect-dev-panel";
 export const effectSection = (id: string) => `effect-section-${id}`;

@@ -80,6 +80,12 @@ function EffectCanvasInner({ className }: EffectCanvasProps) {
 	const [initError, setInitError] = useState<Error | null>(null);
 	if (initError) throw initError;
 
+	// Surface a lost WebGL context to the error boundary the same way: rethrow a
+	// friendly message during render so CanvasErrorBoundary shows it (with Reload)
+	// instead of leaving a silently black canvas.
+	const [contextLostError, setContextLostError] = useState<Error | null>(null);
+	if (contextLostError) throw contextLostError;
+
 	// Draws one frame at the given time. Synchronous, so callers can repaint
 	// within the same tick — e.g. on resize, where reassigning canvas.width
 	// clears the drawing buffer and a deferred rAF would leave one frame of
@@ -137,6 +143,27 @@ function EffectCanvasInner({ className }: EffectCanvasProps) {
 		ctxRef.current = ctx;
 		rendererRef.current = renderer;
 		blitRef.current = blit;
+
+		// When the GPU context is lost (memory pressure, driver reset, tab
+		// backgrounding) the canvas would otherwise silently go black. Stop the
+		// render loop and surface a friendly message. preventDefault is required:
+		// without it the spec makes the loss permanent and unrecoverable.
+		// Auto-restore (rebuilding the regl context + all GPU resources on
+		// webglcontextrestored) is a deliberate follow-up — we ask the user to
+		// reload instead of resuming automatically.
+		const handleContextLost = (event: Event) => {
+			event.preventDefault();
+			if (frameRequestRef.current !== null) {
+				cancelAnimationFrame(frameRequestRef.current);
+				frameRequestRef.current = null;
+			}
+			setContextLostError(
+				new Error(
+					"Graphics rendering stopped — your device may have run out of memory. Try a smaller image, or reload the page.",
+				),
+			);
+		};
+		canvas.addEventListener("webglcontextlost", handleContextLost);
 
 		renderer.setImage(useImageStore.getState().bitmap);
 		renderer.setEffects(useEffectStore.getState().effects);
@@ -208,6 +235,7 @@ function EffectCanvasInner({ className }: EffectCanvasProps) {
 		});
 
 		return () => {
+			canvas.removeEventListener("webglcontextlost", handleContextLost);
 			ro.disconnect();
 			dprQuery?.removeEventListener("change", handleDprChange);
 			unsubImage();
