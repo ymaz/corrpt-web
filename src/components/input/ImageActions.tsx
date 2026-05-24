@@ -1,4 +1,4 @@
-import { Download, ImagePlus, Loader2 } from "lucide-react";
+import { Download, ImagePlus, Loader2, Settings2 } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
@@ -6,6 +6,7 @@ import { SUPPORTED_IMAGE_TYPES } from "@/lib/constants";
 import { exportImage } from "@/lib/exportImage";
 import {
 	DOWNLOAD_BUTTON,
+	EXPORT_OPEN_BUTTON,
 	IMAGE_ERROR,
 	IMAGE_WARNING,
 	REPLACE_FILE_INPUT,
@@ -13,6 +14,7 @@ import {
 } from "@/lib/test-ids";
 import { getTime, useEffectStore } from "@/store/effectStore";
 import { useImageStore } from "@/store/imageStore";
+import { useUIStore } from "@/store/uiStore";
 
 export function ImageActions() {
 	const inputRef = useRef<HTMLInputElement>(null);
@@ -42,6 +44,7 @@ export function ImageActions() {
 	);
 
 	const effects = useEffectStore((s) => s.effects);
+	const openModal = useUIStore((s) => s.openModal);
 
 	const handleClick = useCallback(() => {
 		inputRef.current?.click();
@@ -118,6 +121,16 @@ export function ImageActions() {
 					) : (
 						<Download className="size-5 text-neutral-300" />
 					)}
+				</button>
+
+				<button
+					data-testid={EXPORT_OPEN_BUTTON}
+					type="button"
+					onClick={() => openModal("export")}
+					className="rounded-lg bg-black/50 p-2 backdrop-blur-sm transition-colors hover:bg-black/70"
+					title="Export options"
+				>
+					<Settings2 className="size-5 text-neutral-300" />
 				</button>
 			</div>
 

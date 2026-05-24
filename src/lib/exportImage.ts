@@ -22,6 +22,8 @@ export interface ExportOptions {
 	mimeType: string;
 	fileName: string;
 	time: number;
+	/** Encode quality (0–1) for lossy formats; ignored for PNG. */
+	quality?: number;
 }
 
 /**
@@ -80,7 +82,10 @@ export function exportImage(options: ExportOptions): Promise<void> {
 	};
 
 	const ext = MIME_TO_EXT[mimeType] || "png";
-	const quality = mimeType === "image/png" ? undefined : LOSSY_EXPORT_QUALITY;
+	const quality =
+		mimeType === "image/png"
+			? undefined
+			: (options.quality ?? LOSSY_EXPORT_QUALITY);
 
 	try {
 		const finalTarget = renderEffectChain({

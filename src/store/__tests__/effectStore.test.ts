@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { registerEffect } from "@/effects/registry";
 import type { EffectDefinition } from "@/effects/types";
-import { getTime, setTime, useEffectStore } from "../effectStore";
+import {
+	_resetHistory,
+	getTime,
+	setTime,
+	useEffectStore,
+} from "../effectStore";
 
 const TEST_EFFECT_ID = "store-test-effect";
 
@@ -31,7 +36,13 @@ registerEffect(testDef);
 describe("effectStore", () => {
 	beforeEach(() => {
 		setTime(0);
-		useEffectStore.setState({ effects: [], previewMode: "full" });
+		_resetHistory();
+		useEffectStore.setState({
+			effects: [],
+			previewMode: "full",
+			canUndo: false,
+			canRedo: false,
+		});
 	});
 
 	it("starts with no effects after reset", () => {
@@ -188,5 +199,132 @@ describe("effectStore", () => {
 		useEffectStore.getState().addEffect(TEST_EFFECT_ID);
 		useEffectStore.getState().duplicateEffect("nonexistent");
 		expect(useEffectStore.getState().effects).toHaveLength(1);
+	});
+
+	describe("undo / redo", () => {
+		it("canUndo / canRedo start false and undo / redo are no-ops on empty history", () => {
+			expect(useEffectStore.getState().canUndo).toBe(false);
+			expect(useEffectStore.getState().canRedo).toBe(false);
+			useEffectStore.getState().undo();
+			useEffectStore.getState().redo();
+			expect(useEffectStore.getState().effects).toHaveLength(0);
+		});
+
+		it("undo reverts addEffect and sets canRedo", () => {
+			useEffectStore.getState().addEffect(TEST_EFFECT_ID);
+			expect(useEffectStore.getState().canUndo).toBe(true);
+			useEffectStore.getState().undo();
+			expect(useEffectStore.getState().effects).toHaveLength(0);
+			expect(useEffectStore.getState().canUndo).toBe(false);
+			expect(useEffectStore.getState().canRedo).toBe(true);
+		});
+
+		it("redo reapplies an undone addEffect", () => {
+			useEffectStore.getState().addEffect(TEST_EFFECT_ID);
+			useEffectStore.getState().undo();
+			useEffectStore.getState().redo();
+			expect(useEffectStore.getState().effects).toHaveLength(1);
+			expect(useEffectStore.getState().canRedo).toBe(false);
+		});
+
+		it("a new mutation clears the redo stack", () => {
+			useEffectStore.getState().addEffect(TEST_EFFECT_ID);
+			useEffectStore.getState().undo();
+			expect(useEffectStore.getState().canRedo).toBe(true);
+			useEffectStore.getState().addEffect(TEST_EFFECT_ID);
+			expect(useEffectStore.getState().canRedo).toBe(false);
+		});
+
+		it("coalesces consecutive setEffectParam edits to the same (instanceId, paramName) into one undo step", () => {
+			useEffectStore.getState().addEffect(TEST_EFFECT_ID);
+			const instanceId = useEffectStore.getState().effects[0].instanceId;
+			// Simulates a slider drag — many setEffectParam calls in a row.
+			for (let i = 1; i <= 10; i++) {
+				useEffectStore
+					.getState()
+					.setEffectParam(instanceId, "intensity", i / 10);
+			}
+			expect(useEffectStore.getState().effects[0].parameters.intensity).toBe(
+				1.0,
+			);
+
+			// One undo collapses the whole drag back to the value before it started.
+			useEffectStore.getState().undo();
+			expect(useEffectStore.getState().effects[0].parameters.intensity).toBe(
+				0.5,
+			);
+		});
+
+		it("does not coalesce setEffectParam edits to different params", () => {
+			useEffectStore.getState().addEffect(TEST_EFFECT_ID);
+			const instanceId = useEffectStore.getState().effects[0].instanceId;
+			useEffectStore.getState().setEffectParam(instanceId, "intensity", 0.9);
+			useEffectStore.getState().setEffectParam(instanceId, "active", true);
+
+			useEffectStore.getState().undo();
+			expect(useEffectStore.getState().effects[0].parameters.active).toBe(
+				false,
+			);
+			expect(useEffectStore.getState().effects[0].parameters.intensity).toBe(
+				0.9,
+			);
+
+			useEffectStore.getState().undo();
+			expect(useEffectStore.getState().effects[0].parameters.intensity).toBe(
+				0.5,
+			);
+		});
+
+		it("breaks coalescing when a non-param mutation interrupts the run", () => {
+			useEffectStore.getState().addEffect(TEST_EFFECT_ID);
+			const instanceId = useEffectStore.getState().effects[0].instanceId;
+			useEffectStore.getState().setEffectParam(instanceId, "intensity", 0.7);
+			useEffectStore.getState().addEffect(TEST_EFFECT_ID);
+			useEffectStore.getState().setEffectParam(instanceId, "intensity", 0.9);
+
+			// Three distinct history entries: 0.7 edit, addEffect, 0.9 edit.
+			useEffectStore.getState().undo();
+			expect(useEffectStore.getState().effects[0].parameters.intensity).toBe(
+				0.7,
+			);
+			useEffectStore.getState().undo();
+			expect(useEffectStore.getState().effects).toHaveLength(1);
+			useEffectStore.getState().undo();
+			expect(useEffectStore.getState().effects[0].parameters.intensity).toBe(
+				0.5,
+			);
+		});
+
+		it("caps undo history at 100 entries — oldest steps are dropped", () => {
+			useEffectStore.getState().addEffect(TEST_EFFECT_ID);
+			const instanceId = useEffectStore.getState().effects[0].instanceId;
+			// 130 distinct (non-coalescing) param edits alternating params so each
+			// pushes its own history entry; cap is 100.
+			for (let i = 0; i < 130; i++) {
+				const param = i % 2 === 0 ? "intensity" : "active";
+				const value = i % 2 === 0 ? i / 200 : i % 4 === 1;
+				useEffectStore.getState().setEffectParam(instanceId, param, value);
+			}
+			// Undo every available step; we should be able to undo at most 100 times.
+			let undoCount = 0;
+			while (useEffectStore.getState().canUndo) {
+				useEffectStore.getState().undo();
+				undoCount++;
+				if (undoCount > 200) throw new Error("undo did not terminate");
+			}
+			expect(undoCount).toBe(100);
+		});
+
+		it("applyEffects (preset application) is undoable", () => {
+			useEffectStore.getState().addEffect(TEST_EFFECT_ID);
+			const snapshot = structuredClone(useEffectStore.getState().effects);
+			useEffectStore.getState().applyEffects([]);
+			expect(useEffectStore.getState().effects).toHaveLength(0);
+			useEffectStore.getState().undo();
+			expect(useEffectStore.getState().effects).toHaveLength(1);
+			useEffectStore.getState().redo();
+			expect(useEffectStore.getState().effects).toHaveLength(0);
+			expect(snapshot).toHaveLength(1);
+		});
 	});
 });
