@@ -173,6 +173,22 @@ function EffectCanvasInner({ className }: EffectCanvasProps) {
 		const ro = new ResizeObserver(sync);
 		ro.observe(canvas);
 
+		// A ResizeObserver doesn't fire when only the device pixel ratio changes
+		// (e.g. dragging the window to a display with a different DPR), which would
+		// leave the canvas backing store at the old resolution and blur the
+		// preview. Watch DPR with a resolution media query, re-syncing and
+		// re-arming on each change since the query is pinned to one ratio.
+		let dprQuery: MediaQueryList | null = null;
+		const handleDprChange = () => {
+			dprQuery?.removeEventListener("change", handleDprChange);
+			dprQuery = window.matchMedia(
+				`(resolution: ${window.devicePixelRatio}dppx)`,
+			);
+			dprQuery.addEventListener("change", handleDprChange);
+			sync();
+		};
+		handleDprChange();
+
 		const unsubImage = useImageStore.subscribe((state, prev) => {
 			if (state.bitmap !== prev.bitmap) {
 				renderer.setImage(state.bitmap);
@@ -188,6 +204,7 @@ function EffectCanvasInner({ className }: EffectCanvasProps) {
 
 		return () => {
 			ro.disconnect();
+			dprQuery?.removeEventListener("change", handleDprChange);
 			unsubImage();
 			unsubEffects();
 			if (frameRequestRef.current !== null) {

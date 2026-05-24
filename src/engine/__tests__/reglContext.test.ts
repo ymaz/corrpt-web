@@ -5,7 +5,10 @@ vi.mock("regl");
 
 import { createPassthroughUniforms, createReglContext } from "../reglContext";
 
-type MockRegl = {
+// The regl instance is itself callable — `regl(config)` compiles a draw
+// command — with helper methods hung off it. Model both so command wiring
+// (`createEffectCommand`/`createScreenCommand`) can be asserted.
+type MockRegl = ((config: unknown) => unknown) & {
 	buffer: ReturnType<typeof vi.fn>;
 	prop: ReturnType<typeof vi.fn>;
 	clear: ReturnType<typeof vi.fn>;
@@ -16,14 +19,23 @@ type MockRegl = {
 
 function makeMockRegl(): MockRegl {
 	const fakeBuffer = { destroy: vi.fn() };
-	return {
+	const regl = vi.fn((_config: unknown) => vi.fn());
+	return Object.assign(regl, {
 		buffer: vi.fn(() => fakeBuffer),
 		prop: vi.fn((n: string) => `prop:${n}`),
 		clear: vi.fn(),
 		texture: vi.fn(() => ({ destroy: vi.fn() })),
 		framebuffer: vi.fn(() => ({ destroy: vi.fn() })),
 		destroy: vi.fn(),
-	};
+	}) as unknown as MockRegl;
+}
+
+// The most recent config object passed to `regl(...)` (i.e. the last compiled
+// draw command).
+function lastCommandConfig(regl: MockRegl): Record<string, unknown> {
+	const calls = (regl as unknown as { mock: { calls: unknown[][] } }).mock
+		.calls;
+	return calls[calls.length - 1][0] as Record<string, unknown>;
 }
 
 describe("createReglContext", () => {
@@ -91,6 +103,42 @@ describe("createReglContext", () => {
 		ctx.destroy();
 		expect(fakeBuffer.destroy).toHaveBeenCalledOnce();
 		expect(mock.destroy).toHaveBeenCalledOnce();
+	});
+
+	it("createEffectCommand emits a triangle-strip command, prepends the precision qualifier, and routes to a per-call framebuffer prop", () => {
+		const ctx = createReglContext({} as HTMLCanvasElement);
+		ctx.createEffectCommand({
+			vertexShader: "VERT_SRC",
+			fragmentShader: "FRAG_SRC",
+			uniforms: { u_x: "bound" },
+		});
+		const config = lastCommandConfig(mock);
+		expect(config.vert).toBe("VERT_SRC");
+		// regl, unlike three, injects no precision qualifier — the wrapper must.
+		expect(config.frag).toBe("precision highp float;\nFRAG_SRC");
+		expect(config.primitive).toBe("triangle strip");
+		expect(config.count).toBe(4);
+		expect(config.depth).toMatchObject({ enable: false });
+		expect(config.uniforms).toMatchObject({ u_x: "bound" });
+		expect(
+			(config.attributes as Record<string, unknown>).a_position,
+		).toBeDefined();
+		// Effect passes pick their target framebuffer per invocation; no viewport.
+		expect(config.framebuffer).toBe("prop:framebuffer");
+		expect(config.viewport).toBeUndefined();
+	});
+
+	it("createScreenCommand emits a command with a per-call viewport prop and no framebuffer", () => {
+		const ctx = createReglContext({} as HTMLCanvasElement);
+		ctx.createScreenCommand({
+			vertexShader: "VERT_SRC",
+			fragmentShader: "FRAG_SRC",
+			uniforms: {},
+		});
+		const config = lastCommandConfig(mock);
+		expect(config.frag).toBe("precision highp float;\nFRAG_SRC");
+		expect(config.viewport).toBe("prop:viewport");
+		expect(config.framebuffer).toBeUndefined();
 	});
 });
 
