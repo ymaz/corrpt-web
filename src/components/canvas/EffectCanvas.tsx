@@ -80,36 +80,43 @@ function EffectCanvasInner({ className }: EffectCanvasProps) {
 	const [initError, setInitError] = useState<Error | null>(null);
 	if (initError) throw initError;
 
+	// Draws one frame at the given time. Synchronous, so callers can repaint
+	// within the same tick — e.g. on resize, where reassigning canvas.width
+	// clears the drawing buffer and a deferred rAF would leave one frame of
+	// empty canvas visible (a flash).
+	const drawFrame = useCallback((time: number) => {
+		const ctx = ctxRef.current;
+		const renderer = rendererRef.current;
+		const blit = blitRef.current;
+		if (!ctx || !renderer || !blit) return;
+
+		const output = renderer.renderFrame(time);
+		const fv = fittedViewportRef.current;
+
+		ctx.clear({ color: [0.102, 0.102, 0.102, 1], depth: 1 });
+
+		if (output && fv.width > 0 && fv.height > 0) {
+			blit({
+				u_texture: output,
+				u_resolution: [fv.width, fv.height],
+				u_time: time,
+				viewport: fv,
+			});
+		}
+	}, []);
+
 	const invalidate = useCallback(() => {
 		if (frameRequestRef.current !== null) return;
 		frameRequestRef.current = requestAnimationFrame((ts) => {
 			frameRequestRef.current = null;
-			const ctx = ctxRef.current;
-			const renderer = rendererRef.current;
-			const blit = blitRef.current;
-			if (!ctx || !renderer || !blit) return;
-
 			const dt =
 				lastTsRef.current === null ? 0 : (ts - lastTsRef.current) / 1000;
 			lastTsRef.current = ts;
 			const time = getTime() + dt;
 			setTime(time);
-
-			const output = renderer.renderFrame(time);
-			const fv = fittedViewportRef.current;
-
-			ctx.clear({ color: [0.102, 0.102, 0.102, 1], depth: 1 });
-
-			if (output && fv.width > 0 && fv.height > 0) {
-				blit({
-					u_texture: output,
-					u_resolution: [fv.width, fv.height],
-					u_time: time,
-					viewport: fv,
-				});
-			}
+			drawFrame(time);
 		});
-	}, []);
+	}, [drawFrame]);
 
 	useEffect(() => {
 		const canvas = canvasRef.current;
@@ -138,7 +145,7 @@ function EffectCanvasInner({ className }: EffectCanvasProps) {
 			const { bitmap, dimensions } = useImageStore.getState();
 			if (!bitmap || !dimensions) {
 				fittedViewportRef.current = { x: 0, y: 0, width: 0, height: 0 };
-				invalidate();
+				drawFrame(getTime());
 				return;
 			}
 			const rect = canvas.getBoundingClientRect();
@@ -164,14 +171,28 @@ function EffectCanvasInner({ className }: EffectCanvasProps) {
 				drawW,
 				drawH,
 			);
-			invalidate();
+			drawFrame(getTime());
 		};
 
-		// Size the FBOs and viewport before the first frame so the initial
-		// render draws content, not a black flash.
-		sync();
 		const ro = new ResizeObserver(sync);
 		ro.observe(canvas);
+
+		// Size the FBOs/viewport before the first frame (so the initial render
+		// draws content, not a black flash) and keep them correct when only the
+		// device pixel ratio changes — e.g. dragging the window to a display with a
+		// different DPR, which a ResizeObserver misses and which would otherwise
+		// leave the backing store at the old resolution and blur the preview. The
+		// resolution query is pinned to one ratio, so re-sync and re-arm on change.
+		let dprQuery: MediaQueryList | null = null;
+		const handleDprChange = () => {
+			dprQuery?.removeEventListener("change", handleDprChange);
+			dprQuery = window.matchMedia(
+				`(resolution: ${window.devicePixelRatio}dppx)`,
+			);
+			dprQuery.addEventListener("change", handleDprChange);
+			sync();
+		};
+		handleDprChange();
 
 		const unsubImage = useImageStore.subscribe((state, prev) => {
 			if (state.bitmap !== prev.bitmap) {
@@ -188,6 +209,7 @@ function EffectCanvasInner({ className }: EffectCanvasProps) {
 
 		return () => {
 			ro.disconnect();
+			dprQuery?.removeEventListener("change", handleDprChange);
 			unsubImage();
 			unsubEffects();
 			if (frameRequestRef.current !== null) {
@@ -200,7 +222,7 @@ function EffectCanvasInner({ className }: EffectCanvasProps) {
 			rendererRef.current = null;
 			blitRef.current = null;
 		};
-	}, [invalidate]);
+	}, [invalidate, drawFrame]);
 
 	// The canvas needs explicit fill-parent sizing — plain <canvas> defaults to
 	// 300×150, and getBoundingClientRect on that is what sizes our FBO and viewport.
