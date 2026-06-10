@@ -34,7 +34,7 @@ test.describe("export", () => {
 		page,
 		consoleErrors,
 	}) => {
-		await page.getByTestId(effectToggle("rgbShift")).check();
+		await page.getByTestId(effectToggle("rgbShiftV2")).check();
 
 		const downloadPromise = page.waitForEvent("download");
 		await page.getByTestId(DOWNLOAD_BUTTON).click();

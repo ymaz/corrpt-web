@@ -30,10 +30,12 @@ test.describe("effects", () => {
 		page,
 		consoleErrors,
 	}) => {
-		await expect(page.getByTestId(effectSection("rgbShift"))).toBeVisible();
+		await expect(page.getByTestId(effectSection("rgbShiftV2"))).toBeVisible();
 		await expect(page.getByTestId(effectSection("pixelSort"))).toBeVisible();
 		await expect(page.getByTestId(effectSection("passthrough"))).toHaveCount(0);
-		await expect(page.getByTestId(effectToggle("rgbShift"))).not.toBeChecked();
+		await expect(
+			page.getByTestId(effectToggle("rgbShiftV2")),
+		).not.toBeChecked();
 		await expect(page.getByTestId(effectToggle("pixelSort"))).not.toBeChecked();
 		expect(consoleErrors).toEqual([]);
 	});
@@ -42,8 +44,8 @@ test.describe("effects", () => {
 		page,
 		consoleErrors,
 	}) => {
-		await page.getByTestId(effectToggle("rgbShift")).check();
-		const [instanceId] = await getEffectInstanceIds(page, "rgbShift");
+		await page.getByTestId(effectToggle("rgbShiftV2")).check();
+		const [instanceId] = await getEffectInstanceIds(page, "rgbShiftV2");
 
 		await expect(
 			page.getByTestId(paramSlider(instanceId, "intensity")),
@@ -64,8 +66,8 @@ test.describe("effects", () => {
 		page,
 		consoleErrors,
 	}) => {
-		await page.getByTestId(effectToggle("rgbShift")).check();
-		const [instanceId] = await getEffectInstanceIds(page, "rgbShift");
+		await page.getByTestId(effectToggle("rgbShiftV2")).check();
+		const [instanceId] = await getEffectInstanceIds(page, "rgbShiftV2");
 		await setSliderValue(page, paramSlider(instanceId, "intensity"), 0.8);
 		await expect(
 			page.getByTestId(paramValue(instanceId, "intensity")),
@@ -77,10 +79,10 @@ test.describe("effects", () => {
 		page,
 		consoleErrors,
 	}) => {
-		await page.getByTestId(effectToggle("rgbShift")).check();
-		const [firstInstanceId] = await getEffectInstanceIds(page, "rgbShift");
+		await page.getByTestId(effectToggle("rgbShiftV2")).check();
+		const [firstInstanceId] = await getEffectInstanceIds(page, "rgbShiftV2");
 		await setSliderValue(page, paramSlider(firstInstanceId, "intensity"), 0.8);
-		const rgbShiftSection = page.getByTestId(effectSection("rgbShift"));
+		const rgbShiftSection = page.getByTestId(effectSection("rgbShiftV2"));
 		await rgbShiftSection.locator("[data-testid^='effect-duplicate-']").click();
 		await expect(
 			rgbShiftSection.locator("[data-testid^='effect-instance-']"),
@@ -88,7 +90,7 @@ test.describe("effects", () => {
 
 		const [sourceInstanceId, duplicateInstanceId] = await getEffectInstanceIds(
 			page,
-			"rgbShift",
+			"rgbShiftV2",
 		);
 		await expect(
 			page.getByTestId(paramValue(sourceInstanceId, "intensity")),
@@ -112,8 +114,8 @@ test.describe("effects", () => {
 		page,
 		consoleErrors,
 	}) => {
-		await page.getByTestId(effectToggle("rgbShift")).check();
-		const rgbShiftSection = page.getByTestId(effectSection("rgbShift"));
+		await page.getByTestId(effectToggle("rgbShiftV2")).check();
+		const rgbShiftSection = page.getByTestId(effectSection("rgbShiftV2"));
 		await rgbShiftSection.locator("[data-testid^='effect-duplicate-']").click();
 		await expect(
 			rgbShiftSection.locator("[data-testid^='effect-instance-']"),
@@ -125,9 +127,9 @@ test.describe("effects", () => {
 		await expect(
 			rgbShiftSection.locator("[data-testid^='effect-instance-']"),
 		).toHaveCount(1);
-		const [instanceId] = await getEffectInstanceIds(page, "rgbShift");
+		const [instanceId] = await getEffectInstanceIds(page, "rgbShiftV2");
 
-		await expect(page.getByTestId(effectToggle("rgbShift"))).toBeChecked();
+		await expect(page.getByTestId(effectToggle("rgbShiftV2"))).toBeChecked();
 		await expect(
 			page.getByTestId(paramSlider(instanceId, "intensity")),
 		).toBeVisible();
@@ -163,10 +165,10 @@ test.describe("effects", () => {
 		page,
 		consoleErrors,
 	}) => {
-		await page.getByTestId(effectToggle("rgbShift")).check();
+		await page.getByTestId(effectToggle("rgbShiftV2")).check();
 		await page.getByTestId(effectToggle("pixelSort")).check();
 		const [[rgbShiftInstanceId], [pixelSortInstanceId]] = await Promise.all([
-			getEffectInstanceIds(page, "rgbShift"),
+			getEffectInstanceIds(page, "rgbShiftV2"),
 			getEffectInstanceIds(page, "pixelSort"),
 		]);
 
@@ -199,13 +201,13 @@ test.describe("effects", () => {
 		page,
 		consoleErrors,
 	}) => {
-		await page.getByTestId(effectToggle("rgbShift")).check();
+		await page.getByTestId(effectToggle("rgbShiftV2")).check();
 		await page.getByTestId(effectToggle("pixelSort")).check();
 		const [[rgbShiftInstanceId], [pixelSortInstanceId]] = await Promise.all([
-			getEffectInstanceIds(page, "rgbShift"),
+			getEffectInstanceIds(page, "rgbShiftV2"),
 			getEffectInstanceIds(page, "pixelSort"),
 		]);
-		await page.getByTestId(effectToggle("rgbShift")).uncheck();
+		await page.getByTestId(effectToggle("rgbShiftV2")).uncheck();
 
 		await expect(
 			page.getByTestId(paramSlider(rgbShiftInstanceId, "intensity")),
@@ -220,9 +222,9 @@ test.describe("effects", () => {
 		page,
 		consoleErrors,
 	}) => {
-		await page.getByTestId(effectToggle("rgbShift")).check();
+		await page.getByTestId(effectToggle("rgbShiftV2")).check();
 		await page.getByTestId(effectToggle("pixelSort")).check();
-		await page.getByTestId(effectToggle("rgbShift")).uncheck();
+		await page.getByTestId(effectToggle("rgbShiftV2")).uncheck();
 		await page.getByTestId(effectToggle("pixelSort")).uncheck();
 
 		await expect(page.locator("[data-testid^='param-slider-']")).toHaveCount(0);
