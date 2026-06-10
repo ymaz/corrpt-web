@@ -4,7 +4,6 @@ import "./crtV2";
 import "./noiseV2";
 import "./passthrough";
 import "./pixelSort";
-import "./rgbShift";
 import "./rgbShiftV2";
 import "./sliceShift";
 import "./smear";

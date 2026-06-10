@@ -2,8 +2,14 @@ import type { DrawCommand, Framebuffer2D, Texture2D } from "regl";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ReglContext } from "@/engine/reglContext";
+// Side-effect import: registers the multi-pass crtV2 effect.
+import "../definitions/crtV2";
 import { registerEffect } from "../registry";
-import { type CachedEffect, renderEffectChain } from "../renderEffectChain";
+import {
+	type CachedEffect,
+	chainNeedsScratch,
+	renderEffectChain,
+} from "../renderEffectChain";
 import type { EffectDefinition, EffectInstance } from "../types";
 
 const RC_EFFECT_ID = "rc-chain-effect";
@@ -390,6 +396,33 @@ describe("renderEffectChain", () => {
 			expect(calls[1].props.u_source).toBeUndefined();
 			// The composite pass samples u_source → bound to the effect input.
 			expect(calls[2].props.u_source).toBe(texture);
+		});
+	});
+
+	describe("chainNeedsScratch", () => {
+		it("is false for a chain of single-pass effects", () => {
+			expect(chainNeedsScratch([makeInstance()])).toBe(false);
+		});
+
+		it("is true for a chain containing the multi-pass crtV2 effect", () => {
+			expect(
+				chainNeedsScratch([
+					makeInstance(),
+					makeInstance({ instanceId: "rc-crt", effectId: "crtV2" }),
+				]),
+			).toBe(true);
+		});
+
+		it("ignores disabled multi-pass effects", () => {
+			expect(
+				chainNeedsScratch([
+					makeInstance({
+						instanceId: "rc-crt-off",
+						effectId: "crtV2",
+						enabled: false,
+					}),
+				]),
+			).toBe(false);
 		});
 	});
 
