@@ -18,9 +18,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          # Node 24 breaks `playwright install` with @playwright/test 1.59.x
-          # (hangs forever after the browser download); 22 is fine.
-          node-version: 22
+          node-version: 24
           cache: npm
       - run: npm ci
       - run: npm run lint
@@ -35,9 +33,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
       - run: npm ci
+      # Node 24 needs @playwright/test >= 1.60 — `playwright install` on
+      # 1.59.x hangs forever after the browser download completes.
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v4
