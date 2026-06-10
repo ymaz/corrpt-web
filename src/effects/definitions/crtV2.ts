@@ -1,5 +1,7 @@
 import { registerEffect } from "@/effects/registry";
 import vertexShader from "@/effects/shaders/common/passthrough.vert";
+import bloomH from "@/effects/shaders/crt-v2/bloom-h.glsl";
+import bloomV from "@/effects/shaders/crt-v2/bloom-v.glsl";
 import fragmentShader from "@/effects/shaders/crt-v2/fragment.glsl";
 import type { EffectDefinition } from "@/effects/types";
 
@@ -65,9 +67,26 @@ const crtV2: EffectDefinition = {
 			step: 0.005,
 			label: "Curvature",
 		},
+		{
+			name: "seed",
+			type: "float",
+			default: 0,
+			min: 0,
+			max: 1000,
+			step: 1,
+			label: "Seed",
+		},
 	],
 	vertexShader,
 	fragmentShader,
+	// Separable bloom: bright-pass + horizontal blur → vertical blur → final
+	// composite (which samples the original input via u_source and the blurred
+	// bright-pass via u_texture).
+	passes: [
+		{ fragmentShader: bloomH },
+		{ fragmentShader: bloomV },
+		{ fragmentShader: fragmentShader },
+	],
 };
 
 registerEffect(crtV2);

@@ -1,4 +1,5 @@
-uniform sampler2D u_texture;
+uniform sampler2D u_texture;  // blurred bright-pass from bloom-h → bloom-v
+uniform sampler2D u_source;   // the effect's original input image
 uniform vec2 u_resolution;
 uniform float u_time;
 
@@ -7,7 +8,8 @@ uniform float u_phosphor;     // 0-1: shadow mask strength + bloom
 uniform float u_bleed;        // 0-1: horizontal chroma bleed
 uniform float u_degradation;  // 0-1: signal noise + hsync jitter
 uniform float u_curvature;    // 0-0.15: barrel distortion
-uniform float u_lineCount;    // 100-800: number of scanlines
+uniform float u_lineCount;    // 100-400: number of scanlines
+uniform float u_seed;         // 0-1000: randomization seed
 
 varying vec2 vUv;
 
@@ -34,9 +36,11 @@ void main() {
   // Scanline spacing: derived from lineCount, clamped to min 2px
   float lineH = max(2.0, u_resolution.y / u_lineCount);
 
-  // H-sync jitter: per-row horizontal drift, flickers at ~8fps
+  // H-sync jitter: per-row horizontal drift, flickers at ~8fps.
+  // Frame counter wrapped to keep hash inputs within float32 precision.
   float row = floor(sc.y / lineH);
-  float jPx = (hash(vec2(row, floor(u_time * 8.0))) - 0.5) * u_degradation * 6.0;
+  float jFrame = mod(floor(u_time * 8.0), 1024.0);
+  float jPx = (hash(vec2(row, jFrame + u_seed)) - 0.5) * u_degradation * 6.0;
   vec2 juv = vec2(clamp(uv.x + jPx / u_resolution.x, 0.0, 1.0), uv.y);
   vec2 jsc = juv * u_resolution;
 
@@ -49,17 +53,17 @@ void main() {
 
   // 3-tap weighted smear on R and B (bandwidth-limited chroma like composite video)
   float r = mix(
-    texture2D(u_texture, uvR).r,
-    texture2D(u_texture, clamp(uvR - vec2(smearW,     0.0), 0.0, 1.0)).r * 0.3 +
-    texture2D(u_texture, uvR).r * 0.4 +
-    texture2D(u_texture, clamp(uvR + vec2(smearW,     0.0), 0.0, 1.0)).r * 0.3,
+    texture2D(u_source, uvR).r,
+    texture2D(u_source, clamp(uvR - vec2(smearW,     0.0), 0.0, 1.0)).r * 0.3 +
+    texture2D(u_source, uvR).r * 0.4 +
+    texture2D(u_source, clamp(uvR + vec2(smearW,     0.0), 0.0, 1.0)).r * 0.3,
     u_bleed * 0.6);
-  float g = texture2D(u_texture, uvG).g;
+  float g = texture2D(u_source, uvG).g;
   float b = mix(
-    texture2D(u_texture, uvB).b,
-    texture2D(u_texture, clamp(uvB - vec2(smearW * 0.5, 0.0), 0.0, 1.0)).b * 0.3 +
-    texture2D(u_texture, uvB).b * 0.4 +
-    texture2D(u_texture, clamp(uvB + vec2(smearW * 0.5, 0.0), 0.0, 1.0)).b * 0.3,
+    texture2D(u_source, uvB).b,
+    texture2D(u_source, clamp(uvB - vec2(smearW * 0.5, 0.0), 0.0, 1.0)).b * 0.3 +
+    texture2D(u_source, uvB).b * 0.4 +
+    texture2D(u_source, clamp(uvB + vec2(smearW * 0.5, 0.0), 0.0, 1.0)).b * 0.3,
     u_bleed * 0.45);
 
   vec3 color = vec3(r, g, b);
@@ -91,16 +95,16 @@ void main() {
   color.g *= mix(1.0, gMask, maskVis);
   color.b *= mix(1.0, bMask, maskVis);
 
-  // Phosphor bloom/halation: bright pixels glow into dark neighbors
-  float bloomW = lineH * 2.0 / u_resolution.x;
-  vec3 glowL = texture2D(u_texture, clamp(uvG - vec2(bloomW, 0.0), 0.0, 1.0)).rgb;
-  vec3 glowC = texture2D(u_texture, uvG).rgb;
-  vec3 glowRt = texture2D(u_texture, clamp(uvG + vec2(bloomW, 0.0), 0.0, 1.0)).rgb;
-  vec3 glow = (glowL + glowC * 2.0 + glowRt) * 0.25;
-  color += max(vec3(0.0), glow - 0.5) * u_phosphor * 1.2;
+  // Phosphor bloom/halation: bright pixels glow into dark neighbors.
+  // u_texture is the separably-blurred bright-pass from bloom-h → bloom-v,
+  // so a single fetch yields the radial glow (threshold applied in pass 1).
+  vec3 glow = texture2D(u_texture, uvG).rgb;
+  color += glow * u_phosphor * 1.2;
 
-  // Signal noise (frame-animated)
-  float ns = hash(jsc + vec2(u_time * 97.3, u_time * 131.7));
+  // Signal noise (frame-animated). Time wrapped so hash inputs stay within
+  // float32 precision on long sessions.
+  float tNoise = mod(u_time, 64.0);
+  float ns = hash(jsc + vec2(tNoise * 97.3 + u_seed, tNoise * 131.7));
   color = clamp(color + (ns - 0.5) * u_degradation * 0.18, 0.0, 1.0);
 
   // Subtle always-on vignette
