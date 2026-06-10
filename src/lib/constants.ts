@@ -1,18 +1,3 @@
-import type { WebGLRendererParameters } from "three";
-
-export const RENDERER_SETTINGS: WebGLRendererParameters = {
-	alpha: true,
-	antialias: false,
-	powerPreference: "high-performance",
-};
-
-export const EXPORT_RENDERER_SETTINGS: WebGLRendererParameters = {
-	...RENDERER_SETTINGS,
-	// Required: WebGL may clear the drawing buffer after compositing; toBlob is
-	// async and reads pixels after the frame, so the buffer must be preserved.
-	preserveDrawingBuffer: true,
-};
-
 export const MIME_TO_EXT: Record<string, string> = {
 	"image/jpeg": "jpg",
 	"image/png": "png",

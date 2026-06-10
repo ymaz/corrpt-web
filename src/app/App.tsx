@@ -1,13 +1,18 @@
 import { EffectCanvas } from "@/components/canvas/EffectCanvas";
-import { EffectDevPanel } from "@/components/controls/EffectDevPanel";
+import { EffectsPanel } from "@/components/controls/EffectsPanel";
+import { ExportDialog } from "@/components/controls/ExportDialog";
 import { DropZone, ImageActions } from "@/components/input";
+import { useUndoRedoShortcuts } from "@/hooks/useUndoRedoShortcuts";
 
 function App() {
+	useUndoRedoShortcuts();
+
 	return (
 		<DropZone>
 			<EffectCanvas />
 			<ImageActions />
-			<EffectDevPanel />
+			<EffectsPanel />
+			<ExportDialog />
 		</DropZone>
 	);
 }

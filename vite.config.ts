@@ -31,13 +31,12 @@ export default defineConfig({
 					minShareCount: 1,
 					groups: [
 						{
-							name: "vendor-three",
-							test: /node_modules[\\/]three[\\/]/,
-							priority: 10,
+							name: "vendor-react",
+							test: /node_modules[\\/](react|react-dom)[\\/]/,
 						},
 						{
-							name: "vendor-react",
-							test: /node_modules[\\/](react|react-dom|@react-three)[\\/]/,
+							name: "vendor-regl",
+							test: /node_modules[\\/]regl[\\/]/,
 						},
 					],
 				},

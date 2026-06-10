@@ -1,6 +1,5 @@
 uniform sampler2D u_texture;
 uniform vec2 u_resolution;
-uniform float u_time;
 
 uniform float u_intensity;   // 0-1: maximum block displacement (±30% of image)
 uniform float u_gridSizeX;   // 2-32: horizontal block count
@@ -22,6 +21,7 @@ void main() {
   float offsetX = (hash(blockCoord + vec2(u_seed + 7.3, 0.0)) * 2.0 - 1.0) * u_intensity * 0.3;
   float offsetY = (hash(blockCoord + vec2(0.0, u_seed + 13.7)) * 2.0 - 1.0) * u_intensity * 0.3;
   vec2 dispUV = uv + vec2(offsetX, offsetY) * shouldDisplace;
+  dispUV = clamp(dispUV, 0.0, 1.0);
 
   gl_FragColor = texture2D(u_texture, dispUV);
 }
