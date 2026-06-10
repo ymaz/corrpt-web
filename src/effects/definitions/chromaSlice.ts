@@ -31,11 +31,14 @@ const chromaSlice: EffectDefinition = {
 		},
 		{
 			name: "paletteMode",
-			type: "float",
-			default: 0,
-			min: 0,
-			max: 3,
-			step: 1,
+			type: "enum",
+			default: "warm",
+			options: [
+				{ label: "Warm", value: "warm" },
+				{ label: "Cool", value: "cool" },
+				{ label: "Mono", value: "mono" },
+				{ label: "Chaos", value: "chaos" },
+			],
 			label: "Palette",
 		},
 		{
