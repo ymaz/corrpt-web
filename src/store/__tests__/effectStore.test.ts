@@ -4,6 +4,7 @@ import type { EffectDefinition } from "@/effects/types";
 import {
 	_resetHistory,
 	getTime,
+	MAX_LAYERS,
 	setTime,
 	useEffectStore,
 } from "../effectStore";
@@ -131,11 +132,58 @@ describe("effectStore", () => {
 		expect(effects[1].instanceId).not.toBe(instanceId);
 	});
 
-	it("removeEffectsByEffectId removes all instances of an effect", () => {
+	it("toggleEffect flips the enabled flag", () => {
 		useEffectStore.getState().addEffect(TEST_EFFECT_ID);
+		const instanceId = useEffectStore.getState().effects[0].instanceId;
+		useEffectStore.getState().toggleEffect(instanceId);
+		expect(useEffectStore.getState().effects[0].enabled).toBe(false);
+		useEffectStore.getState().toggleEffect(instanceId);
+		expect(useEffectStore.getState().effects[0].enabled).toBe(true);
+	});
+
+	it("toggleEffect is a no-op for an unknown instanceId", () => {
 		useEffectStore.getState().addEffect(TEST_EFFECT_ID);
-		useEffectStore.getState().removeEffectsByEffectId(TEST_EFFECT_ID);
-		expect(useEffectStore.getState().effects).toHaveLength(0);
+		useEffectStore.getState().toggleEffect("nonexistent");
+		expect(useEffectStore.getState().effects[0].enabled).toBe(true);
+		expect(useEffectStore.getState().canUndo).toBe(true); // only the add
+		useEffectStore.getState().undo();
+		expect(useEffectStore.getState().canUndo).toBe(false);
+	});
+
+	it("toggleEffect is undoable", () => {
+		useEffectStore.getState().addEffect(TEST_EFFECT_ID);
+		const instanceId = useEffectStore.getState().effects[0].instanceId;
+		useEffectStore.getState().toggleEffect(instanceId);
+		useEffectStore.getState().undo();
+		expect(useEffectStore.getState().effects[0].enabled).toBe(true);
+	});
+
+	it("addEffect is a no-op at the layer cap", () => {
+		for (let i = 0; i < MAX_LAYERS; i++) {
+			useEffectStore.getState().addEffect(TEST_EFFECT_ID);
+		}
+		expect(useEffectStore.getState().effects).toHaveLength(MAX_LAYERS);
+		useEffectStore.getState().addEffect(TEST_EFFECT_ID);
+		expect(useEffectStore.getState().effects).toHaveLength(MAX_LAYERS);
+	});
+
+	it("duplicateEffect is a no-op at the layer cap", () => {
+		for (let i = 0; i < MAX_LAYERS; i++) {
+			useEffectStore.getState().addEffect(TEST_EFFECT_ID);
+		}
+		const instanceId = useEffectStore.getState().effects[0].instanceId;
+		useEffectStore.getState().duplicateEffect(instanceId);
+		expect(useEffectStore.getState().effects).toHaveLength(MAX_LAYERS);
+	});
+
+	it("applyEffects clamps oversized stacks to the layer cap", () => {
+		useEffectStore.getState().addEffect(TEST_EFFECT_ID);
+		const template = useEffectStore.getState().effects[0];
+		const oversized = Array.from({ length: MAX_LAYERS + 5 }, () =>
+			structuredClone(template),
+		);
+		useEffectStore.getState().applyEffects(oversized);
+		expect(useEffectStore.getState().effects).toHaveLength(MAX_LAYERS);
 	});
 
 	it("setPreviewMode updates previewMode", () => {

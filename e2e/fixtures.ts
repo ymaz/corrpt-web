@@ -1,8 +1,8 @@
 import { test as base, expect, type Page } from "@playwright/test";
 
 import {
-	effectSection,
 	LANDING_FILE_INPUT,
+	LAYERS_PANEL,
 	REPLACE_FILE_INPUT,
 } from "../src/lib/test-ids";
 
@@ -21,6 +21,7 @@ export const test = base.extend<Fixtures>({
 	},
 });
 
+export type { Page };
 export { expect };
 
 export async function uploadViaLanding(
@@ -41,27 +42,35 @@ export async function uploadViaReplace(
 		.setInputFiles(file);
 }
 
+/**
+ * Instance ids of all layers for an effect, in pipeline order (first applied
+ * first). The layers panel renders Photoshop-style — top = applied last — so
+ * the DOM order is reversed before returning.
+ */
 export async function getEffectInstanceIds(
 	page: Page,
 	effectId: string,
 ): Promise<string[]> {
-	const prefix = "effect-instance-";
-	const container = page.getByTestId(effectSection(effectId));
-	const instances = container.locator(`[data-testid^="${prefix}"]`);
-	if ((await instances.count()) === 0) {
-		throw new Error(`No instances found for effect: ${effectId}`);
+	const prefix = "layer-item-";
+	const container = page.getByTestId(LAYERS_PANEL);
+	const layers = container.locator(
+		`[data-testid^="${prefix}"][data-effect-id="${effectId}"]`,
+	);
+	if ((await layers.count()) === 0) {
+		throw new Error(`No layers found for effect: ${effectId}`);
 	}
-	return instances.evaluateAll(
+	const displayOrder = await layers.evaluateAll(
 		(elements, prefix) =>
 			elements.map((element) => {
 				const testId = element.getAttribute("data-testid");
 				if (!testId?.startsWith(prefix)) {
-					throw new Error(`Effect instance test id not found: ${testId}`);
+					throw new Error(`Layer test id not found: ${testId}`);
 				}
 				return testId.slice(prefix.length);
 			}),
 		prefix,
 	);
+	return displayOrder.reverse();
 }
 
 /**

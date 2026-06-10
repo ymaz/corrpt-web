@@ -21,6 +21,8 @@ npm run test:e2e # Playwright e2e tests
 
 **Effect pipeline**: ping-pong FBO chain — `Original Texture → Effect 1 → Effect 2 → … → Screen`. `renderEffectChain()` (`src/effects/renderEffectChain.ts`) is a pure function shared by live preview and export.
 
+**Layer model**: active effects are a flat bucket of layers (`effectStore.effects`, capped at `MAX_LAYERS = 10`, any mix of effect types). Array order is pipeline order; the layers UI renders it reversed, Photoshop-style — top layer = applied last, new layers appear on top. Each layer can be toggled (`enabled`), reordered, duplicated, and deleted. `effectStore.bypassed` is a preview-only before/after switch that renders the original image without mutating any layer's state.
+
 **Engine** (`src/engine/`): `reglContext.ts` owns the regl instance and shared geometry; `createEffectChainRenderer.ts` is the functional factory for driving the chain.
 
 **Effect registration**: definition files in `src/effects/definitions/` self-register via `registerEffect()` as a barrel import side effect. To add an effect: create the file, add it to `src/effects/definitions/index.ts`.

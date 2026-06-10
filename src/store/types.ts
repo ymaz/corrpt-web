@@ -40,7 +40,7 @@ interface EffectState {
 interface EffectActions {
 	addEffect: (effectId: string) => void;
 	removeEffect: (instanceId: string) => void;
-	removeEffectsByEffectId: (effectId: string) => void;
+	toggleEffect: (instanceId: string) => void;
 	setEffectParam: (
 		instanceId: string,
 		paramName: string,

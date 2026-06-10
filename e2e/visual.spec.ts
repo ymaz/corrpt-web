@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 
 import { PNG } from "pngjs";
 
-import { EFFECT_DEV_PANEL, effectToggle } from "../src/lib/test-ids";
+import { EFFECT_DEV_PANEL, effectAdd } from "../src/lib/test-ids";
 import {
 	activateMultiPassAuxFixture,
 	expect,
@@ -111,7 +111,7 @@ test.describe("visual", () => {
 		// the effect renders to the canvas directly and the final blit samples
 		// empty FBOs, producing a uniform white surface. The variance check
 		// catches that regression class.
-		await page.getByTestId(effectToggle("rgbShiftV2")).check();
+		await page.getByTestId(effectAdd("rgbShiftV2")).click();
 
 		// Poll the invariant directly: once the effect has rendered, the canvas
 		// must still be non-background and non-uniform. The broken FBO-routing

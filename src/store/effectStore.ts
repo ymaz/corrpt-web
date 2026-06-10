@@ -33,7 +33,8 @@ function createEffectInstance(effectId: string): EffectInstance {
 	};
 }
 
-export const MAX_EFFECT_INSTANCES = 3;
+// Layers are a flat bucket — one global cap, any mix of effect types.
+export const MAX_LAYERS = 10;
 const HISTORY_LIMIT = 100;
 
 // Module-level clock — advanced per rendered frame by EffectCanvas, read at
@@ -88,11 +89,7 @@ export const useEffectStore = create<EffectStore>((set, get) => {
 
 		addEffect: (effectId: string) => {
 			const { effects } = get();
-			if (
-				effects.filter((e) => e.effectId === effectId).length >=
-				MAX_EFFECT_INSTANCES
-			)
-				return;
+			if (effects.length >= MAX_LAYERS) return;
 			pushHistory(null);
 			set({
 				effects: [...effects, createEffectInstance(effectId)],
@@ -110,12 +107,16 @@ export const useEffectStore = create<EffectStore>((set, get) => {
 			});
 		},
 
-		removeEffectsByEffectId: (effectId: string) => {
+		toggleEffect: (instanceId: string) => {
 			const { effects } = get();
-			if (!effects.some((effect) => effect.effectId === effectId)) return;
+			if (!effects.some((effect) => effect.instanceId === instanceId)) return;
 			pushHistory(null);
 			set({
-				effects: effects.filter((effect) => effect.effectId !== effectId),
+				effects: effects.map((effect) =>
+					effect.instanceId === instanceId
+						? { ...effect, enabled: !effect.enabled }
+						: effect,
+				),
 				...flags(),
 			});
 		},
@@ -174,12 +175,8 @@ export const useEffectStore = create<EffectStore>((set, get) => {
 			);
 			if (sourceIndex === -1) return;
 
+			if (effects.length >= MAX_LAYERS) return;
 			const source = effects[sourceIndex];
-			if (
-				effects.filter((e) => e.effectId === source.effectId).length >=
-				MAX_EFFECT_INSTANCES
-			)
-				return;
 			const duplicate: EffectInstance = {
 				...source,
 				instanceId: createInstanceId(source.effectId),
@@ -193,7 +190,8 @@ export const useEffectStore = create<EffectStore>((set, get) => {
 		},
 
 		applyEffects: (effects: EffectInstance[]) => {
-			const next = effects.map((effect) => ({
+			// Presets saved before the layer cap existed may exceed it — clamp.
+			const next = effects.slice(0, MAX_LAYERS).map((effect) => ({
 				...effect,
 				instanceId: createInstanceId(effect.effectId),
 				parameters: structuredClone(effect.parameters),

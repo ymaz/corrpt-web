@@ -1,30 +1,37 @@
 import * as Tooltip from "@radix-ui/react-tooltip";
 import {
 	ChevronDown,
+	ChevronRight,
 	ChevronUp,
 	Copy,
+	Plus,
 	Redo2,
 	Trash2,
 	Undo2,
 } from "lucide-react";
-import { memo, useMemo } from "react";
+import { memo, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
-import { getAllEffects } from "@/effects/registry";
+import { getAllEffects, getEffect } from "@/effects/registry";
 import type { EffectDefinition } from "@/effects/types";
 import {
 	EFFECT_DEV_PANEL,
-	effectDuplicate,
-	effectInstance,
-	effectMoveDown,
-	effectMoveUp,
-	effectRemove,
+	effectAdd,
 	effectSection,
-	effectToggle,
+	LAYERS_COUNT,
+	LAYERS_EMPTY,
+	LAYERS_PANEL,
+	layerDuplicate,
+	layerExpand,
+	layerItem,
+	layerMoveDown,
+	layerMoveUp,
+	layerRemove,
+	layerToggle,
 	REDO_BUTTON,
 	UNDO_BUTTON,
 } from "@/lib/test-ids";
-import { MAX_EFFECT_INSTANCES, useEffectStore } from "@/store/effectStore";
+import { MAX_LAYERS, useEffectStore } from "@/store/effectStore";
 import { useImageStore } from "@/store/imageStore";
 
 import { ParamRow } from "./ParamControls";
@@ -77,15 +84,13 @@ function IconButton({
 // Subscribes only to its own instance — re-renders when its params change, not
 // when siblings do. memo prevents cascades when the parent re-renders on
 // add/remove/reorder.
-const EffectInstanceBlock = memo(function EffectInstanceBlock({
+const LayerRow = memo(function LayerRow({
 	instanceId,
 	def,
-	index,
 	atLimit,
 }: {
 	instanceId: string;
 	def: EffectDefinition;
-	index: number;
 	atLimit: boolean;
 }) {
 	const instance = useEffectStore((s) =>
@@ -94,22 +99,25 @@ const EffectInstanceBlock = memo(function EffectInstanceBlock({
 	const setEffectParam = useEffectStore((s) => s.setEffectParam);
 	const removeEffect = useEffectStore((s) => s.removeEffect);
 	const duplicateEffect = useEffectStore((s) => s.duplicateEffect);
+	const toggleEffect = useEffectStore((s) => s.toggleEffect);
 	const reorderEffects = useEffectStore((s) => s.reorderEffects);
-	// Global stack position drives move-button enablement: reorder operates on the
-	// full stack, not just same-effect instances.
-	const { isFirst, isLast } = useEffectStore(
+	const [expanded, setExpanded] = useState(true);
+	// Layers display top = applied last, so the top row is the END of the
+	// pipeline array and "move up" means "apply later".
+	const { isTop, isBottom } = useEffectStore(
 		useShallow((s) => {
 			const pos = s.effects.findIndex((e) => e.instanceId === instanceId);
-			return { isFirst: pos === 0, isLast: pos === s.effects.length - 1 };
+			return { isTop: pos === s.effects.length - 1, isBottom: pos === 0 };
 		}),
 	);
 
 	if (!instance) return null;
 
+	// direction is visual: -1 = up (later in pipeline), +1 = down (earlier).
 	function move(direction: -1 | 1) {
 		const order = useEffectStore.getState().effects.map((e) => e.instanceId);
 		const from = order.indexOf(instanceId);
-		const to = from + direction;
+		const to = from - direction;
 		if (from === -1 || to < 0 || to >= order.length) return;
 		[order[from], order[to]] = [order[to], order[from]];
 		reorderEffects(order);
@@ -117,45 +125,59 @@ const EffectInstanceBlock = memo(function EffectInstanceBlock({
 
 	return (
 		<div
-			data-testid={effectInstance(instanceId)}
-			className="mb-3 rounded-md border border-white/10 p-3 last:mb-0"
+			data-testid={layerItem(instanceId)}
+			data-effect-id={def.id}
+			className={`mb-2 rounded-md border border-white/10 p-2 last:mb-0 ${
+				instance.enabled ? "" : "opacity-50"
+			}`}
 		>
-			<div className="mb-2 flex items-center justify-between gap-2">
-				<span className="text-xs font-medium text-white/50">
-					Instance {index + 1}
-				</span>
+			<div className="flex items-center gap-2">
+				<input
+					data-testid={layerToggle(instanceId)}
+					type="checkbox"
+					className="accent-fuchsia-500"
+					title={instance.enabled ? "Disable layer" : "Enable layer"}
+					checked={instance.enabled}
+					onChange={() => toggleEffect(instanceId)}
+				/>
+				<button
+					data-testid={layerExpand(instanceId)}
+					type="button"
+					title={expanded ? "Collapse" : "Expand"}
+					onClick={() => setExpanded((e) => !e)}
+					className="flex min-w-0 flex-1 items-center gap-1 text-left font-medium text-white/90 hover:text-white"
+				>
+					{expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+					<span className="truncate">{def.name}</span>
+				</button>
 				<div className="flex gap-1">
 					<IconButton
-						testId={effectMoveUp(instanceId)}
-						title="Move up"
-						disabled={isFirst}
+						testId={layerMoveUp(instanceId)}
+						title="Move up (applied later)"
+						disabled={isTop}
 						onClick={() => move(-1)}
 					>
 						<ChevronUp size={12} />
 					</IconButton>
 					<IconButton
-						testId={effectMoveDown(instanceId)}
-						title="Move down"
-						disabled={isLast}
+						testId={layerMoveDown(instanceId)}
+						title="Move down (applied earlier)"
+						disabled={isBottom}
 						onClick={() => move(1)}
 					>
 						<ChevronDown size={12} />
 					</IconButton>
 					<IconButton
-						testId={effectDuplicate(instanceId)}
-						title={
-							atLimit
-								? `Max ${MAX_EFFECT_INSTANCES} instances per effect`
-								: "Duplicate"
-						}
+						testId={layerDuplicate(instanceId)}
+						title={atLimit ? `Max ${MAX_LAYERS} layers` : "Duplicate layer"}
 						disabled={atLimit}
 						onClick={() => duplicateEffect(instanceId)}
 					>
 						<Copy size={12} />
 					</IconButton>
 					<IconButton
-						testId={effectRemove(instanceId)}
-						title="Remove instance"
+						testId={layerRemove(instanceId)}
+						title="Delete layer"
 						danger
 						onClick={() => removeEffect(instanceId)}
 					>
@@ -164,15 +186,24 @@ const EffectInstanceBlock = memo(function EffectInstanceBlock({
 				</div>
 			</div>
 
-			{def.parameters.map((param) => (
-				<ParamRow
-					key={param.name}
-					instanceId={instanceId}
-					param={param}
-					value={instance.parameters[param.name] ?? param.default}
-					setEffectParam={setEffectParam}
-				/>
-			))}
+			{expanded && (
+				<div className="mt-2 border-t border-white/10 pt-2">
+					{def.shortDescription && (
+						<p className="mb-2 text-xs italic text-white/40">
+							{def.shortDescription}
+						</p>
+					)}
+					{def.parameters.map((param) => (
+						<ParamRow
+							key={param.name}
+							instanceId={instanceId}
+							param={param}
+							value={instance.parameters[param.name] ?? param.default}
+							setEffectParam={setEffectParam}
+						/>
+					))}
+				</div>
+			)}
 		</div>
 	);
 });
@@ -229,69 +260,8 @@ function HistoryControls() {
 	);
 }
 
-function EffectSection({
-	def,
-	instanceKeys,
-}: {
-	def: EffectDefinition;
-	instanceKeys: string[];
-}) {
+function EffectCatalog({ atLimit }: { atLimit: boolean }) {
 	const addEffect = useEffectStore((s) => s.addEffect);
-	const removeEffectsByEffectId = useEffectStore(
-		(s) => s.removeEffectsByEffectId,
-	);
-
-	const isActive = instanceKeys.length > 0;
-	const atLimit = instanceKeys.length >= MAX_EFFECT_INSTANCES;
-
-	return (
-		<div data-testid={effectSection(def.id)} className="mb-3 last:mb-0">
-			<label className="flex items-center gap-2 font-medium text-white/90">
-				<input
-					data-testid={effectToggle(def.id)}
-					type="checkbox"
-					className="accent-fuchsia-500"
-					checked={isActive}
-					onChange={(e) => {
-						if (e.target.checked) addEffect(def.id);
-						else removeEffectsByEffectId(def.id);
-					}}
-				/>
-				{def.name}
-			</label>
-
-			{isActive && def.shortDescription && (
-				<p className="mt-1 mb-2 pl-6 text-xs italic text-white/40">
-					{def.shortDescription}
-				</p>
-			)}
-
-			{isActive && (
-				<div className="mt-2">
-					{instanceKeys.map((instanceId, index) => (
-						<EffectInstanceBlock
-							key={instanceId}
-							instanceId={instanceId}
-							def={def}
-							index={index}
-							atLimit={atLimit}
-						/>
-					))}
-				</div>
-			)}
-		</div>
-	);
-}
-
-export function EffectsPanel() {
-	const bitmap = useImageStore((s) => s.bitmap);
-
-	// Structural selector — re-renders only on add/remove/reorder, not param
-	// changes. String entries compare by value via Object.is; object literals
-	// would always fail shallow equality even with identical content.
-	const effectKeys = useEffectStore(
-		useShallow((s) => s.effects.map((e) => `${e.instanceId}|${e.effectId}`)),
-	);
 
 	const grouped = useMemo(() => {
 		const defs = getAllEffects().filter((e) => e.id !== "passthrough");
@@ -310,6 +280,89 @@ export function EffectsPanel() {
 		}));
 	}, []);
 
+	return (
+		<>
+			{grouped.map(({ category, defs }) => (
+				<div key={category} className="mb-3 last:mb-0">
+					<h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-white/40">
+						{CATEGORY_LABELS[category]}
+					</h3>
+					<div className="flex flex-col gap-1">
+						{defs.map((def) => (
+							<div key={def.id} data-testid={effectSection(def.id)}>
+								<button
+									data-testid={effectAdd(def.id)}
+									type="button"
+									disabled={atLimit}
+									title={
+										atLimit
+											? `Max ${MAX_LAYERS} layers`
+											: (def.shortDescription ?? `Add ${def.name} layer`)
+									}
+									onClick={() => addEffect(def.id)}
+									className="flex w-full items-center gap-2 rounded bg-white/5 px-2 py-1.5 text-left text-white/90 transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-30"
+								>
+									<Plus size={12} className="shrink-0 text-fuchsia-400" />
+									<span className="truncate">{def.name}</span>
+								</button>
+							</div>
+						))}
+					</div>
+				</div>
+			))}
+		</>
+	);
+}
+
+function LayersSection({ layerKeys }: { layerKeys: string[] }) {
+	const atLimit = layerKeys.length >= MAX_LAYERS;
+
+	return (
+		<div data-testid={LAYERS_PANEL} className="mb-4">
+			<div className="mb-2 flex items-baseline justify-between">
+				<h3 className="text-xs font-semibold uppercase tracking-wide text-white/40">
+					Layers
+				</h3>
+				<span data-testid={LAYERS_COUNT} className="text-xs text-white/40">
+					{layerKeys.length}/{MAX_LAYERS}
+				</span>
+			</div>
+
+			{layerKeys.length === 0 ? (
+				<p data-testid={LAYERS_EMPTY} className="text-xs italic text-white/40">
+					No layers yet — add an effect below.
+				</p>
+			) : (
+				// Photoshop convention: topmost layer is applied last, so render
+				// the pipeline array in reverse. New layers appear on top.
+				[...layerKeys].reverse().map((key) => {
+					const instanceId = key.slice(0, key.lastIndexOf("|"));
+					const def = getEffect(key.slice(key.lastIndexOf("|") + 1));
+					if (!def) return null;
+					return (
+						<LayerRow
+							key={instanceId}
+							instanceId={instanceId}
+							def={def}
+							atLimit={atLimit}
+						/>
+					);
+				})
+			)}
+		</div>
+	);
+}
+
+export function EffectsPanel() {
+	const bitmap = useImageStore((s) => s.bitmap);
+
+	// Structural selector — re-renders only on add/remove/reorder, not param
+	// changes. String entries compare by value via Object.is; object literals
+	// would always fail shallow equality even with identical content.
+	const layerKeys = useEffectStore(
+		useShallow((s) => s.effects.map((e) => `${e.instanceId}|${e.effectId}`)),
+	);
+
 	if (!bitmap) return null;
 
 	return (
@@ -319,22 +372,11 @@ export function EffectsPanel() {
 		>
 			<HistoryControls />
 
-			{grouped.map(({ category, defs }) => (
-				<div key={category} className="mb-4 last:mb-0">
-					<h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-white/40">
-						{CATEGORY_LABELS[category]}
-					</h3>
-					{defs.map((def) => (
-						<EffectSection
-							key={def.id}
-							def={def}
-							instanceKeys={effectKeys
-								.filter((k) => k.endsWith(`|${def.id}`))
-								.map((k) => k.slice(0, k.lastIndexOf("|")))}
-						/>
-					))}
-				</div>
-			))}
+			<LayersSection layerKeys={layerKeys} />
+
+			<div className="mb-4 border-t border-white/10 pt-3">
+				<EffectCatalog atLimit={layerKeys.length >= MAX_LAYERS} />
+			</div>
 
 			<PresetsSection />
 		</div>
