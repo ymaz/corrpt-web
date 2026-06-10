@@ -23,8 +23,9 @@ void main() {
   float scanRes = vert > 0.5 ? u_resolution.x : u_resolution.y;
   float randFactor = hash(vec2(floor(scanline * scanRes), u_seed));
 
-  // Smear length in pixels, randomized per scanline
-  float maxDist = u_intensity * float(MAX_SMEAR_PX) * (0.5 + randFactor);
+  // Smear length in pixels: resolution-relative, randomized per scanline,
+  // hard-capped at MAX_SMEAR_PX so the loop bound is the true maximum
+  float maxDist = min(u_intensity * (0.5 + randFactor) * 0.15 * scanRes, float(MAX_SMEAR_PX));
 
   // Direction to look backward (left or up)
   vec2 dir = mix(vec2(-1.0, 0.0), vec2(0.0, -1.0), vert);
@@ -60,10 +61,12 @@ void main() {
   }
 
   if (foundSource) {
-    // Hard smear: replace pixel with source color
-    // Falloff controls edge hardness (0 = hard replacement, 1 = gradient fade)
+    // Falloff controls edge hardness:
+    // 0 = full-strength smear up to maxDist with a hard end,
+    // 1 = gradient fade across the whole smear length
+    // (+1e-3 keeps smoothstep edges distinct — equal edges are undefined GLSL)
     float t = sourceDist / maxDist;
-    float blend = 1.0 - smoothstep(0.0, u_falloff + 0.01, t);
+    float blend = 1.0 - smoothstep(max(0.0, 1.0 - u_falloff), 1.0 + 1e-3, t);
     gl_FragColor = mix(original, sourceColor, blend);
   } else {
     gl_FragColor = original;

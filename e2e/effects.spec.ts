@@ -151,7 +151,7 @@ test.describe("effects", () => {
 			page.getByTestId(paramSlider(instanceId, "spread")),
 		).toBeVisible();
 		await expect(
-			page.getByTestId(paramSlider(instanceId, "direction")),
+			page.getByTestId(paramSlider(instanceId, "angle")),
 		).toBeVisible();
 		await expect(
 			page.getByTestId(paramValue(instanceId, "threshold")),

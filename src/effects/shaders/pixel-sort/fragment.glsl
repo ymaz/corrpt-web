@@ -3,7 +3,7 @@ uniform vec2 u_resolution;
 uniform float u_threshold;
 uniform float u_upperThreshold;
 uniform float u_spread;
-uniform float u_direction;
+uniform float u_angle;
 
 varying vec2 vUv;
 
@@ -15,8 +15,12 @@ void main() {
   vec4 original = texture2D(u_texture, vUv);
   float brightness = getBrightness(original.rgb);
 
-  if (brightness >= u_threshold && brightness <= u_upperThreshold) {
-    vec2 dir = normalize(mix(vec2(1.0, 0.0), vec2(0.0, 1.0), u_direction));
+  // Robust to swapped thresholds (user may set threshold > upperThreshold)
+  float lo = min(u_threshold, u_upperThreshold);
+  float hi = max(u_threshold, u_upperThreshold);
+
+  if (brightness >= lo && brightness <= hi) {
+    vec2 dir = vec2(cos(u_angle), sin(u_angle));
     vec2 sortStep = dir * u_spread / u_resolution;
 
     vec4 sum = vec4(0.0);
