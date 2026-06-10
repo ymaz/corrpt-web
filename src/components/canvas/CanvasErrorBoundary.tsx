@@ -1,5 +1,7 @@
 import { Component, type ReactNode } from "react";
 
+import { CANVAS_ERROR } from "@/lib/test-ids";
+
 interface Props {
 	children: ReactNode;
 	resetKey?: string | null;
@@ -26,7 +28,10 @@ export class CanvasErrorBoundary extends Component<Props, State> {
 	render() {
 		if (this.state.hasError) {
 			return (
-				<div className="flex h-full w-full items-center justify-center bg-neutral-900">
+				<div
+					data-testid={CANVAS_ERROR}
+					className="flex h-full w-full items-center justify-center bg-neutral-900"
+				>
 					<div className="max-w-md rounded-lg border border-neutral-700 bg-neutral-800 p-6 text-center">
 						<h2 className="mb-2 text-lg font-semibold text-neutral-100">
 							Rendering Error
