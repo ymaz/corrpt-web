@@ -6,7 +6,6 @@ import {
 	effectAdd,
 	effectSection,
 	LAYERS_COUNT,
-	LAYERS_EMPTY,
 	LAYERS_PANEL,
 	layerDuplicate,
 	layerMoveDown,
@@ -44,7 +43,7 @@ test.describe("effects", () => {
 		await expect(page.getByTestId(EFFECT_DEV_PANEL)).toBeVisible();
 	});
 
-	test("panel renders catalog add buttons and an empty layers bucket", async ({
+	test("panel renders catalog add buttons; layers panel hidden until a layer exists", async ({
 		page,
 		consoleErrors,
 	}) => {
@@ -52,8 +51,7 @@ test.describe("effects", () => {
 		await expect(page.getByTestId(effectSection("pixelSort"))).toBeVisible();
 		await expect(page.getByTestId(effectSection("passthrough"))).toHaveCount(0);
 		await expect(page.getByTestId(effectAdd("rgbShiftV2"))).toBeEnabled();
-		await expect(page.getByTestId(LAYERS_EMPTY)).toBeVisible();
-		await expect(page.getByTestId(LAYERS_COUNT)).toHaveText("0/10");
+		await expect(page.getByTestId(LAYERS_PANEL)).toHaveCount(0);
 		expect(consoleErrors).toEqual([]);
 	});
 
@@ -247,7 +245,7 @@ test.describe("effects", () => {
 		expect(consoleErrors).toEqual([]);
 	});
 
-	test("deleting all layers restores the empty state", async ({
+	test("deleting all layers hides the layers panel", async ({
 		page,
 		consoleErrors,
 	}) => {
@@ -261,7 +259,7 @@ test.describe("effects", () => {
 		await page.getByTestId(layerRemove(rgbShiftInstanceId)).click();
 		await page.getByTestId(layerRemove(pixelSortInstanceId)).click();
 
-		await expect(page.getByTestId(LAYERS_EMPTY)).toBeVisible();
+		await expect(page.getByTestId(LAYERS_PANEL)).toHaveCount(0);
 		await expect(page.locator("[data-testid^='param-slider-']")).toHaveCount(0);
 		expect(consoleErrors).toEqual([]);
 	});

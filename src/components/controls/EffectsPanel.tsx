@@ -19,7 +19,6 @@ import {
 	effectAdd,
 	effectSection,
 	LAYERS_COUNT,
-	LAYERS_EMPTY,
 	LAYERS_PANEL,
 	layerDuplicate,
 	layerExpand,
@@ -318,7 +317,7 @@ function LayersSection({ layerKeys }: { layerKeys: string[] }) {
 	const atLimit = layerKeys.length >= MAX_LAYERS;
 
 	return (
-		<div data-testid={LAYERS_PANEL} className="mb-4">
+		<>
 			<div className="mb-2 flex items-baseline justify-between">
 				<h3 className="text-xs font-semibold uppercase tracking-wide text-white/40">
 					Layers
@@ -328,30 +327,27 @@ function LayersSection({ layerKeys }: { layerKeys: string[] }) {
 				</span>
 			</div>
 
-			{layerKeys.length === 0 ? (
-				<p data-testid={LAYERS_EMPTY} className="text-xs italic text-white/40">
-					No layers yet — add an effect below.
-				</p>
-			) : (
-				// Photoshop convention: topmost layer is applied last, so render
-				// the pipeline array in reverse. New layers appear on top.
-				[...layerKeys].reverse().map((key) => {
-					const instanceId = key.slice(0, key.lastIndexOf("|"));
-					const def = getEffect(key.slice(key.lastIndexOf("|") + 1));
-					if (!def) return null;
-					return (
-						<LayerRow
-							key={instanceId}
-							instanceId={instanceId}
-							def={def}
-							atLimit={atLimit}
-						/>
-					);
-				})
-			)}
-		</div>
+			{/* Photoshop convention: topmost layer is applied last, so render
+			    the pipeline array in reverse. New layers appear on top. */}
+			{[...layerKeys].reverse().map((key) => {
+				const instanceId = key.slice(0, key.lastIndexOf("|"));
+				const def = getEffect(key.slice(key.lastIndexOf("|") + 1));
+				if (!def) return null;
+				return (
+					<LayerRow
+						key={instanceId}
+						instanceId={instanceId}
+						def={def}
+						atLimit={atLimit}
+					/>
+				);
+			})}
+		</>
 	);
 }
+
+const PANEL_CLASS =
+	"flex max-h-[85vh] w-72 flex-col overflow-y-auto rounded-lg border border-white/10 bg-black/80 p-4 text-sm text-white backdrop-blur-md";
 
 export function EffectsPanel() {
 	const bitmap = useImageStore((s) => s.bitmap);
@@ -366,19 +362,18 @@ export function EffectsPanel() {
 	if (!bitmap) return null;
 
 	return (
-		<div
-			data-testid={EFFECT_DEV_PANEL}
-			className="fixed bottom-4 right-4 z-30 flex max-h-[85vh] w-72 flex-col overflow-y-auto rounded-lg border border-white/10 bg-black/80 p-4 text-sm text-white backdrop-blur-md"
-		>
-			<HistoryControls />
+		<div className="fixed bottom-4 right-4 z-30 flex items-end gap-3">
+			{layerKeys.length > 0 && (
+				<div data-testid={LAYERS_PANEL} className={PANEL_CLASS}>
+					<LayersSection layerKeys={layerKeys} />
+				</div>
+			)}
 
-			<LayersSection layerKeys={layerKeys} />
-
-			<div className="mb-4 border-t border-white/10 pt-3">
+			<div data-testid={EFFECT_DEV_PANEL} className={PANEL_CLASS}>
+				<HistoryControls />
 				<EffectCatalog atLimit={layerKeys.length >= MAX_LAYERS} />
+				<PresetsSection />
 			</div>
-
-			<PresetsSection />
 		</div>
 	);
 }

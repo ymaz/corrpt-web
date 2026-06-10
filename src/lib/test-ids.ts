@@ -17,9 +17,8 @@ export const EFFECT_DEV_PANEL = "effect-dev-panel";
 export const effectSection = (id: string) => `effect-section-${id}`;
 export const effectAdd = (id: string) => `effect-add-${id}`;
 
-// Layers bucket
+// Layers bucket — the panel is mounted only while at least one layer exists
 export const LAYERS_PANEL = "layers-panel";
-export const LAYERS_EMPTY = "layers-empty";
 export const LAYERS_COUNT = "layers-count";
 export const layerItem = (instanceId: string) => `layer-item-${instanceId}`;
 export const layerToggle = (instanceId: string) => `layer-toggle-${instanceId}`;
