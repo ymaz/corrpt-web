@@ -111,7 +111,7 @@ test.describe("visual", () => {
 		// the effect renders to the canvas directly and the final blit samples
 		// empty FBOs, producing a uniform white surface. The variance check
 		// catches that regression class.
-		await page.getByTestId(effectToggle("rgbShift")).check();
+		await page.getByTestId(effectToggle("rgbShiftV2")).check();
 
 		// Poll the invariant directly: once the effect has rendered, the canvas
 		// must still be non-background and non-uniform. The broken FBO-routing

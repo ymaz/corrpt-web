@@ -5,7 +5,7 @@ import type { EffectDefinition } from "@/effects/types";
 
 const rgbShiftV2: EffectDefinition = {
 	id: "rgbShiftV2",
-	name: "RGB Shift V2",
+	name: "RGB Shift",
 	category: "color",
 	description:
 		"Aggressive chromatic split — G anchored, R/B offset with per-pixel jitter and per-row banding.",
@@ -46,6 +46,15 @@ const rgbShiftV2: EffectDefinition = {
 			max: 1,
 			step: 0.01,
 			label: "Scanline Bands",
+		},
+		{
+			name: "seed",
+			type: "float",
+			default: 0,
+			min: 0,
+			max: 1000,
+			step: 1,
+			label: "Seed",
 		},
 	],
 	vertexShader,
