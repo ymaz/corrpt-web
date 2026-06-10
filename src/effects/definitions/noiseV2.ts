@@ -6,7 +6,7 @@ import type { EffectDefinition } from "@/effects/types";
 const noiseV2: EffectDefinition = {
 	id: "noiseV2",
 	name: "Noise",
-	category: "aesthetic",
+	category: "noise",
 	description:
 		"Film grain — Gaussian-distributed smooth grain with midtone-peaked luma response and frame-animated texture.",
 	shortDescription: "film grain",
