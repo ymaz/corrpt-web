@@ -1,6 +1,8 @@
 import { test as base, expect, type Page } from "@playwright/test";
 
 import {
+	ADD_EFFECT_BUTTON,
+	effectAdd,
 	LANDING_FILE_INPUT,
 	LAYERS_PANEL,
 	REPLACE_FILE_INPUT,
@@ -40,6 +42,15 @@ export async function uploadViaReplace(
 	await page
 		.locator(`[data-testid="${REPLACE_FILE_INPUT}"]`)
 		.setInputFiles(file);
+}
+
+/** Adds an effect layer via the sidebar's "Add effect" dropdown menu. */
+export async function addEffectLayer(
+	page: Page,
+	effectId: string,
+): Promise<void> {
+	await page.getByTestId(ADD_EFFECT_BUTTON).click();
+	await page.getByTestId(effectAdd(effectId)).click();
 }
 
 /**

@@ -1,9 +1,12 @@
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import {
 	ChevronDown,
 	ChevronRight,
 	ChevronUp,
 	Copy,
+	PanelRightClose,
+	PanelRightOpen,
 	Plus,
 	Redo2,
 	Trash2,
@@ -15,10 +18,10 @@ import { useShallow } from "zustand/react/shallow";
 import { getAllEffects, getEffect } from "@/effects/registry";
 import type { EffectDefinition } from "@/effects/types";
 import {
-	EFFECT_DEV_PANEL,
+	ADD_EFFECT_BUTTON,
 	effectAdd,
-	effectSection,
 	LAYERS_COUNT,
+	LAYERS_EMPTY,
 	LAYERS_PANEL,
 	layerDuplicate,
 	layerExpand,
@@ -28,10 +31,14 @@ import {
 	layerRemove,
 	layerToggle,
 	REDO_BUTTON,
+	SIDEBAR,
+	SIDEBAR_OPEN,
+	SIDEBAR_TOGGLE,
 	UNDO_BUTTON,
 } from "@/lib/test-ids";
 import { MAX_LAYERS, useEffectStore } from "@/store/effectStore";
 import { useImageStore } from "@/store/imageStore";
+import { useUIStore } from "@/store/uiStore";
 
 import { ParamRow } from "./ParamControls";
 import { PresetsSection } from "./PresetsSection";
@@ -215,7 +222,7 @@ function HistoryControls() {
 
 	return (
 		<Tooltip.Provider delayDuration={300}>
-			<div className="mb-3 flex gap-2">
+			<div className="flex flex-1 gap-2">
 				<Tooltip.Root>
 					<Tooltip.Trigger asChild>
 						<button
@@ -259,7 +266,9 @@ function HistoryControls() {
 	);
 }
 
-function EffectCatalog({ atLimit }: { atLimit: boolean }) {
+// "Add effect" button opening a categorized menu — selecting an item adds a
+// layer immediately.
+function AddEffectMenu({ atLimit }: { atLimit: boolean }) {
 	const addEffect = useEffectStore((s) => s.addEffect);
 
 	const grouped = useMemo(() => {
@@ -280,36 +289,43 @@ function EffectCatalog({ atLimit }: { atLimit: boolean }) {
 	}, []);
 
 	return (
-		<>
-			{grouped.map(({ category, defs }) => (
-				<div key={category} className="mb-3 last:mb-0">
-					<h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-white/40">
-						{CATEGORY_LABELS[category]}
-					</h3>
-					<div className="flex flex-col gap-1">
-						{defs.map((def) => (
-							<div key={def.id} data-testid={effectSection(def.id)}>
-								<button
+		<DropdownMenu.Root>
+			<DropdownMenu.Trigger
+				data-testid={ADD_EFFECT_BUTTON}
+				disabled={atLimit}
+				title={atLimit ? `Max ${MAX_LAYERS} layers` : "Add an effect layer"}
+				className="flex w-full items-center justify-center gap-1.5 rounded bg-fuchsia-600/80 px-2 py-1.5 font-medium text-white outline-none transition hover:bg-fuchsia-600 focus-visible:ring-1 focus-visible:ring-fuchsia-400 disabled:cursor-not-allowed disabled:opacity-40"
+			>
+				<Plus size={14} />
+				Add effect
+				<ChevronDown size={14} className="text-white/60" />
+			</DropdownMenu.Trigger>
+			<DropdownMenu.Portal>
+				<DropdownMenu.Content
+					sideOffset={4}
+					className="z-50 min-w-(--radix-dropdown-menu-trigger-width) rounded-md border border-white/10 bg-neutral-900/95 p-1 text-sm text-white shadow-xl backdrop-blur-sm"
+				>
+					{grouped.map(({ category, defs }) => (
+						<DropdownMenu.Group key={category}>
+							<DropdownMenu.Label className="px-2 pt-1.5 pb-0.5 text-xs font-semibold uppercase tracking-wide text-white/40">
+								{CATEGORY_LABELS[category]}
+							</DropdownMenu.Label>
+							{defs.map((def) => (
+								<DropdownMenu.Item
+									key={def.id}
 									data-testid={effectAdd(def.id)}
-									type="button"
-									disabled={atLimit}
-									title={
-										atLimit
-											? `Max ${MAX_LAYERS} layers`
-											: (def.shortDescription ?? `Add ${def.name} layer`)
-									}
-									onClick={() => addEffect(def.id)}
-									className="flex w-full items-center gap-2 rounded bg-white/5 px-2 py-1.5 text-left text-white/90 transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-30"
+									title={def.shortDescription}
+									className="cursor-pointer rounded px-2 py-1 outline-none data-highlighted:bg-fuchsia-500/30"
+									onSelect={() => addEffect(def.id)}
 								>
-									<Plus size={12} className="shrink-0 text-fuchsia-400" />
-									<span className="truncate">{def.name}</span>
-								</button>
-							</div>
-						))}
-					</div>
-				</div>
-			))}
-		</>
+									{def.name}
+								</DropdownMenu.Item>
+							))}
+						</DropdownMenu.Group>
+					))}
+				</DropdownMenu.Content>
+			</DropdownMenu.Portal>
+		</DropdownMenu.Root>
 	);
 }
 
@@ -317,7 +333,10 @@ function LayersSection({ layerKeys }: { layerKeys: string[] }) {
 	const atLimit = layerKeys.length >= MAX_LAYERS;
 
 	return (
-		<>
+		<div
+			data-testid={LAYERS_PANEL}
+			className="flex min-h-0 flex-1 flex-col border-t border-white/10 pt-3"
+		>
 			<div className="mb-2 flex items-baseline justify-between">
 				<h3 className="text-xs font-semibold uppercase tracking-wide text-white/40">
 					Layers
@@ -327,30 +346,40 @@ function LayersSection({ layerKeys }: { layerKeys: string[] }) {
 				</span>
 			</div>
 
-			{/* Photoshop convention: topmost layer is applied last, so render
-			    the pipeline array in reverse. New layers appear on top. */}
-			{[...layerKeys].reverse().map((key) => {
-				const instanceId = key.slice(0, key.lastIndexOf("|"));
-				const def = getEffect(key.slice(key.lastIndexOf("|") + 1));
-				if (!def) return null;
-				return (
-					<LayerRow
-						key={instanceId}
-						instanceId={instanceId}
-						def={def}
-						atLimit={atLimit}
-					/>
-				);
-			})}
-		</>
+			<div className="min-h-0 flex-1 overflow-y-auto">
+				{layerKeys.length === 0 ? (
+					<p
+						data-testid={LAYERS_EMPTY}
+						className="text-xs italic text-white/40"
+					>
+						No layers yet — add an effect above.
+					</p>
+				) : (
+					// Photoshop convention: topmost layer is applied last, so render
+					// the pipeline array in reverse. New layers appear on top.
+					[...layerKeys].reverse().map((key) => {
+						const instanceId = key.slice(0, key.lastIndexOf("|"));
+						const def = getEffect(key.slice(key.lastIndexOf("|") + 1));
+						if (!def) return null;
+						return (
+							<LayerRow
+								key={instanceId}
+								instanceId={instanceId}
+								def={def}
+								atLimit={atLimit}
+							/>
+						);
+					})
+				)}
+			</div>
+		</div>
 	);
 }
 
-const PANEL_CLASS =
-	"flex max-h-[85vh] w-72 flex-col overflow-y-auto rounded-lg border border-white/10 bg-black/80 p-4 text-sm text-white backdrop-blur-md";
-
-export function EffectsPanel() {
+export function Sidebar() {
 	const bitmap = useImageStore((s) => s.bitmap);
+	const sidebarOpen = useUIStore((s) => s.sidebarOpen);
+	const toggleSidebar = useUIStore((s) => s.toggleSidebar);
 
 	// Structural selector — re-renders only on add/remove/reorder, not param
 	// changes. String entries compare by value via Object.is; object literals
@@ -361,19 +390,43 @@ export function EffectsPanel() {
 
 	if (!bitmap) return null;
 
-	return (
-		<div className="fixed bottom-4 right-4 z-30 flex items-end gap-3">
-			{layerKeys.length > 0 && (
-				<div data-testid={LAYERS_PANEL} className={PANEL_CLASS}>
-					<LayersSection layerKeys={layerKeys} />
-				</div>
-			)}
+	if (!sidebarOpen) {
+		return (
+			<button
+				data-testid={SIDEBAR_OPEN}
+				type="button"
+				title="Show sidebar"
+				onClick={toggleSidebar}
+				className="fixed top-4 right-4 z-30 rounded-lg bg-black/50 p-2 backdrop-blur-sm transition-colors hover:bg-black/70"
+			>
+				<PanelRightOpen className="size-5 text-neutral-300" />
+			</button>
+		);
+	}
 
-			<div data-testid={EFFECT_DEV_PANEL} className={PANEL_CLASS}>
+	return (
+		<aside
+			data-testid={SIDEBAR}
+			className="flex h-full w-80 shrink-0 flex-col gap-3 border-l border-white/10 bg-black/80 p-4 text-sm text-white backdrop-blur-md"
+		>
+			<div className="flex items-center gap-2">
 				<HistoryControls />
-				<EffectCatalog atLimit={layerKeys.length >= MAX_LAYERS} />
+				<IconButton
+					testId={SIDEBAR_TOGGLE}
+					title="Hide sidebar"
+					onClick={toggleSidebar}
+				>
+					<PanelRightClose size={16} />
+				</IconButton>
+			</div>
+
+			<AddEffectMenu atLimit={layerKeys.length >= MAX_LAYERS} />
+
+			<LayersSection layerKeys={layerKeys} />
+
+			<div className="shrink-0">
 				<PresetsSection />
 			</div>
-		</div>
+		</aside>
 	);
 }

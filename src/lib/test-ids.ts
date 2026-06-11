@@ -12,13 +12,16 @@ export const IMAGE_WARNING = "image-warning";
 // Canvas
 export const CANVAS_ERROR = "canvas-error";
 
-// Effects panel — catalog of add buttons
-export const EFFECT_DEV_PANEL = "effect-dev-panel";
-export const effectSection = (id: string) => `effect-section-${id}`;
+// Sidebar — control panel (catalog, presets, history) + layers bucket
+export const SIDEBAR = "sidebar";
+export const SIDEBAR_TOGGLE = "sidebar-toggle";
+export const SIDEBAR_OPEN = "sidebar-open";
+export const ADD_EFFECT_BUTTON = "add-effect-button";
 export const effectAdd = (id: string) => `effect-add-${id}`;
 
-// Layers bucket — the panel is mounted only while at least one layer exists
+// Layers bucket
 export const LAYERS_PANEL = "layers-panel";
+export const LAYERS_EMPTY = "layers-empty";
 export const LAYERS_COUNT = "layers-count";
 export const layerItem = (instanceId: string) => `layer-item-${instanceId}`;
 export const layerToggle = (instanceId: string) => `layer-toggle-${instanceId}`;

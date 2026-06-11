@@ -3,9 +3,10 @@ import { fileURLToPath } from "node:url";
 
 import { PNG } from "pngjs";
 
-import { EFFECT_DEV_PANEL, effectAdd } from "../src/lib/test-ids";
+import { SIDEBAR } from "../src/lib/test-ids";
 import {
 	activateMultiPassAuxFixture,
+	addEffectLayer,
 	expect,
 	test,
 	uploadViaLanding,
@@ -68,7 +69,7 @@ test.describe("visual", () => {
 	test.beforeEach(async ({ page }) => {
 		await page.goto("/");
 		await uploadViaLanding(page, testImage);
-		await expect(page.getByTestId(EFFECT_DEV_PANEL)).toBeVisible();
+		await expect(page.getByTestId(SIDEBAR)).toBeVisible();
 		// Wait for the first real frame instead of a fixed delay: the center
 		// pixel leaves the background color once the image has rendered.
 		await expect
@@ -111,7 +112,7 @@ test.describe("visual", () => {
 		// the effect renders to the canvas directly and the final blit samples
 		// empty FBOs, producing a uniform white surface. The variance check
 		// catches that regression class.
-		await page.getByTestId(effectAdd("rgbShiftV2")).click();
+		await addEffectLayer(page, "rgbShiftV2");
 
 		// Poll the invariant directly: once the effect has rendered, the canvas
 		// must still be non-background and non-uniform. The broken FBO-routing
