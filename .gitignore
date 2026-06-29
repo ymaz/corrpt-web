@@ -18,7 +18,7 @@ dist-ssr
 
 # Random
 .air/
-__plans
+__plans/
 
 # Test artifacts (generated)
 /playwright-report/

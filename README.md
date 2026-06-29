@@ -6,31 +6,22 @@
 
 A client-side web app for applying real-time glitch and distortion effects to images. Create corrupted art on your device - **offline, no server, no tokens**. Only you in charge. Inspired by the Glitche iOS app. Born on the web.
 
-[Try it out](https://ymaz.github.io/corrpt-web/)
+[Try it](https://ymaz.github.io/corrpt-web/)
 
 ## Features
 
 - Real-time WebGL effects with instant preview
-- Multi-pass effect chaining (stack multiple effects)
-- Full-resolution export
+- Stack multiple effects in any order
 - Drag-and-drop image upload
+- Full-resolution export
 
-### Effects
+## Effects
 
-- RGB Shift (chromatic aberration)
-- Pixel Sort
-- CRT
-- Noise
-- Smear
-- Slice Shift
+RGB Shift · Chroma Slice · Pixel Sort · CRT · Noise · Smear · Slice Shift · Block Glitch
 
-## Tech Stack
+## Stack
 
-- React + TypeScript
-- Three.js / React Three Fiber
-- Zustand (state management)
-- Tailwind CSS
-- Vite
+React 19 · TypeScript · regl (WebGL) · Zustand · Tailwind CSS · Vite
 
 ## Development
 
@@ -39,10 +30,10 @@ npm install
 npm run dev
 ```
 
-## Privacy and Data Collection
+## Privacy
 
-Your images never leave your device. All processing happens client-side (on device) in your browser using WebGL. No data is collected, stored, or transmitted to any server.
+Your images never leave your device. All processing is client-side via WebGL. Nothing is collected or transmitted.
 
 ## License
 
-[Polyform Noncommercial 1.0.0](LICENSE.md) - Source code is provided for reference and educational purposes only. See license for details.
+[Polyform Noncommercial 1.0.0](LICENSE.md)
