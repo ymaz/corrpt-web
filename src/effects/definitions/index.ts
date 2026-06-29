@@ -1,6 +1,7 @@
 import "./blockGlitch";
 import "./chromaSlice";
 import "./crtV2";
+import "./dither";
 import "./noiseV2";
 import "./passthrough";
 import "./pixelSort";
