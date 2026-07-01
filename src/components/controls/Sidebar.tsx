@@ -5,6 +5,8 @@ import {
 	ChevronRight,
 	ChevronUp,
 	Copy,
+	Eye,
+	EyeOff,
 	PanelRightClose,
 	PanelRightOpen,
 	Plus,
@@ -20,6 +22,7 @@ import type { EffectDefinition } from "@/effects/types";
 import {
 	ADD_EFFECT_BUTTON,
 	effectAdd,
+	LAYERS_BYPASS,
 	LAYERS_COUNT,
 	LAYERS_EMPTY,
 	LAYERS_PANEL,
@@ -93,10 +96,13 @@ function IconButton({
 const LayerRow = memo(function LayerRow({
 	instanceId,
 	def,
+	ordinal,
 	atLimit,
 }: {
 	instanceId: string;
 	def: EffectDefinition;
+	/** 1-based count among layers of the same effect, display-only. */
+	ordinal: number;
 	atLimit: boolean;
 }) {
 	const instance = useEffectStore((s) =>
@@ -154,7 +160,9 @@ const LayerRow = memo(function LayerRow({
 					className="flex min-w-0 flex-1 items-center gap-1 text-left font-medium text-white/90 hover:text-white"
 				>
 					{expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-					<span className="truncate">{def.name}</span>
+					<span className="truncate">
+						{def.name} {ordinal}
+					</span>
 				</button>
 				<div className="flex gap-1">
 					<IconButton
@@ -331,23 +339,67 @@ function AddEffectMenu({ atLimit }: { atLimit: boolean }) {
 
 function LayersSection({ layerKeys }: { layerKeys: string[] }) {
 	const atLimit = layerKeys.length >= MAX_LAYERS;
+	const bypassed = useEffectStore((s) => s.bypassed);
+	const toggleBypass = useEffectStore((s) => s.toggleBypass);
+
+	// Display-only numbering: 1-based occurrence among layers of the same
+	// effect, counted in pipeline order. Renumbers when earlier copies are
+	// deleted — it labels positions, not identities.
+	const rows = useMemo(() => {
+		const counts = new Map<string, number>();
+		return layerKeys.map((key) => {
+			const instanceId = key.slice(0, key.lastIndexOf("|"));
+			const effectId = key.slice(key.lastIndexOf("|") + 1);
+			const ordinal = (counts.get(effectId) ?? 0) + 1;
+			counts.set(effectId, ordinal);
+			return { instanceId, effectId, ordinal };
+		});
+	}, [layerKeys]);
 
 	return (
 		<div
 			data-testid={LAYERS_PANEL}
 			className="flex min-h-0 flex-1 flex-col border-t border-white/10 pt-3"
 		>
-			<div className="mb-2 flex items-baseline justify-between">
+			<div className="mb-2 flex items-center justify-between">
 				<h3 className="text-xs font-semibold uppercase tracking-wide text-white/40">
 					Layers
 				</h3>
-				<span data-testid={LAYERS_COUNT} className="text-xs text-white/40">
-					{layerKeys.length}/{MAX_LAYERS}
-				</span>
+				<div className="flex items-center gap-2">
+					<button
+						data-testid={LAYERS_BYPASS}
+						type="button"
+						disabled={layerKeys.length === 0}
+						title={
+							bypassed
+								? "Show layers (after)"
+								: "Hide all layers — compare with original (before)"
+						}
+						onClick={toggleBypass}
+						className={`rounded p-1 transition disabled:cursor-not-allowed disabled:opacity-30 ${
+							bypassed
+								? "bg-amber-500/30 text-amber-300 hover:bg-amber-500/40"
+								: "bg-white/10 text-white/70 hover:bg-white/20"
+						}`}
+					>
+						{bypassed ? <EyeOff size={14} /> : <Eye size={14} />}
+					</button>
+					<span data-testid={LAYERS_COUNT} className="text-xs text-white/40">
+						{layerKeys.length}/{MAX_LAYERS}
+					</span>
+				</div>
 			</div>
 
-			<div className="min-h-0 flex-1 overflow-y-auto">
-				{layerKeys.length === 0 ? (
+			{bypassed && (
+				<p className="mb-2 text-xs italic text-amber-300/80">
+					Showing original — layers bypassed.
+				</p>
+			)}
+
+			<div
+				className={`min-h-0 flex-1 overflow-y-auto ${bypassed ? "opacity-50" : ""}`}
+			>
+				{rows.length === 0 ? (
 					<p
 						data-testid={LAYERS_EMPTY}
 						className="text-xs italic text-white/40"
@@ -357,15 +409,15 @@ function LayersSection({ layerKeys }: { layerKeys: string[] }) {
 				) : (
 					// Photoshop convention: topmost layer is applied last, so render
 					// the pipeline array in reverse. New layers appear on top.
-					[...layerKeys].reverse().map((key) => {
-						const instanceId = key.slice(0, key.lastIndexOf("|"));
-						const def = getEffect(key.slice(key.lastIndexOf("|") + 1));
+					[...rows].reverse().map(({ instanceId, effectId, ordinal }) => {
+						const def = getEffect(effectId);
 						if (!def) return null;
 						return (
 							<LayerRow
 								key={instanceId}
 								instanceId={instanceId}
 								def={def}
+								ordinal={ordinal}
 								atLimit={atLimit}
 							/>
 						);

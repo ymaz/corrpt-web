@@ -23,6 +23,7 @@ export const effectAdd = (id: string) => `effect-add-${id}`;
 export const LAYERS_PANEL = "layers-panel";
 export const LAYERS_EMPTY = "layers-empty";
 export const LAYERS_COUNT = "layers-count";
+export const LAYERS_BYPASS = "layers-bypass";
 export const layerItem = (instanceId: string) => `layer-item-${instanceId}`;
 export const layerToggle = (instanceId: string) => `layer-toggle-${instanceId}`;
 export const layerExpand = (instanceId: string) => `layer-expand-${instanceId}`;

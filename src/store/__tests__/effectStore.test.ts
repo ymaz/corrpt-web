@@ -40,6 +40,7 @@ describe("effectStore", () => {
 		_resetHistory();
 		useEffectStore.setState({
 			effects: [],
+			bypassed: false,
 			previewMode: "full",
 			canUndo: false,
 			canRedo: false,
@@ -189,6 +190,30 @@ describe("effectStore", () => {
 	it("setPreviewMode updates previewMode", () => {
 		useEffectStore.getState().setPreviewMode("split");
 		expect(useEffectStore.getState().previewMode).toBe("split");
+	});
+
+	it("toggleBypass flips bypassed without touching layer enabled state", () => {
+		useEffectStore.getState().addEffect(TEST_EFFECT_ID);
+		expect(useEffectStore.getState().bypassed).toBe(false);
+
+		useEffectStore.getState().toggleBypass();
+		expect(useEffectStore.getState().bypassed).toBe(true);
+		// Bypass is preview-only: the layer's own enabled flag is untouched, so
+		// toggling back restores the exact prior state.
+		expect(useEffectStore.getState().effects[0].enabled).toBe(true);
+
+		useEffectStore.getState().toggleBypass();
+		expect(useEffectStore.getState().bypassed).toBe(false);
+		expect(useEffectStore.getState().effects[0].enabled).toBe(true);
+	});
+
+	it("toggleBypass is not recorded in undo history", () => {
+		useEffectStore.getState().addEffect(TEST_EFFECT_ID);
+		useEffectStore.getState().toggleBypass();
+		// Undo should revert the addEffect, not the bypass toggle.
+		useEffectStore.getState().undo();
+		expect(useEffectStore.getState().effects).toHaveLength(0);
+		expect(useEffectStore.getState().bypassed).toBe(true);
 	});
 
 	it("getTime returns 0 on reset", () => {

@@ -4,10 +4,12 @@ import { fileURLToPath } from "node:url";
 import {
 	ADD_EFFECT_BUTTON,
 	effectAdd,
+	LAYERS_BYPASS,
 	LAYERS_COUNT,
 	LAYERS_EMPTY,
 	LAYERS_PANEL,
 	layerDuplicate,
+	layerExpand,
 	layerMoveDown,
 	layerRemove,
 	layerToggle,
@@ -293,6 +295,58 @@ test.describe("effects", () => {
 		}
 		await expect(page.getByTestId(LAYERS_COUNT)).toHaveText("10/10");
 		await expect(page.getByTestId(ADD_EFFECT_BUTTON)).toBeDisabled();
+		expect(consoleErrors).toEqual([]);
+	});
+
+	test("duplicate layers of the same effect are numbered 1, 2, 3…", async ({
+		page,
+		consoleErrors,
+	}) => {
+		await addEffectLayer(page, "rgbShiftV2");
+		const [firstInstanceId] = await getEffectInstanceIds(page, "rgbShiftV2");
+		await page.getByTestId(layerDuplicate(firstInstanceId)).click();
+		await page.getByTestId(layerDuplicate(firstInstanceId)).click();
+
+		// Ordinals count in pipeline order, so the header labels read 1..3 from the
+		// bottom of the (reversed) list upward.
+		await expect(
+			page.getByTestId(LAYERS_PANEL).locator("[data-testid^='layer-expand-']"),
+		).toHaveText(["RGB Shift 3", "RGB Shift 2", "RGB Shift 1"]);
+		expect(consoleErrors).toEqual([]);
+	});
+
+	test("bypass toggle hides layers then restores their exact state", async ({
+		page,
+		consoleErrors,
+	}) => {
+		await addEffectLayer(page, "rgbShiftV2");
+		const [instanceId] = await getEffectInstanceIds(page, "rgbShiftV2");
+		await setSliderValue(page, paramSlider(instanceId, "intensity"), 0.8);
+		// Collapse the layer so we can prove UI state survives a bypass round-trip.
+		await page.getByTestId(layerExpand(instanceId)).click();
+		await expect(
+			page.getByTestId(paramSlider(instanceId, "intensity")),
+		).toHaveCount(0);
+
+		await page.getByTestId(LAYERS_BYPASS).click();
+		// Layer row and its stored value persist while bypassed — nothing is removed.
+		await expect(page.getByTestId(layerToggle(instanceId))).toBeChecked();
+
+		await page.getByTestId(LAYERS_BYPASS).click();
+		await page.getByTestId(layerExpand(instanceId)).click();
+		await expect(
+			page.getByTestId(paramValue(instanceId, "intensity")),
+		).toHaveText("0.80");
+		expect(consoleErrors).toEqual([]);
+	});
+
+	test("bypass toggle is disabled until a layer exists", async ({
+		page,
+		consoleErrors,
+	}) => {
+		await expect(page.getByTestId(LAYERS_BYPASS)).toBeDisabled();
+		await addEffectLayer(page, "rgbShiftV2");
+		await expect(page.getByTestId(LAYERS_BYPASS)).toBeEnabled();
 		expect(consoleErrors).toEqual([]);
 	});
 });

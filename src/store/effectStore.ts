@@ -83,6 +83,10 @@ export const useEffectStore = create<EffectStore>((set, get) => {
 
 	return {
 		effects: [],
+		// Preview-only before/after toggle: render the original image while true.
+		// Deliberately not in undo history and never touches per-layer `enabled`,
+		// so flipping it back restores the exact previous state.
+		bypassed: false,
 		previewMode: "full",
 		canUndo: false,
 		canRedo: false,
@@ -214,6 +218,10 @@ export const useEffectStore = create<EffectStore>((set, get) => {
 			past.push(structuredClone(get().effects));
 			coalesceKey = null;
 			set({ effects: next, ...flags() });
+		},
+
+		toggleBypass: () => {
+			set((state) => ({ bypassed: !state.bypassed }));
 		},
 
 		setPreviewMode: (mode) => {
