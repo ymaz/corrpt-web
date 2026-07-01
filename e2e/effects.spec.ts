@@ -349,4 +349,20 @@ test.describe("effects", () => {
 		await expect(page.getByTestId(LAYERS_BYPASS)).toBeEnabled();
 		expect(consoleErrors).toEqual([]);
 	});
+
+	test("a disabled layer stays disabled across a bypass round-trip", async ({
+		page,
+		consoleErrors,
+	}) => {
+		await addEffectLayer(page, "rgbShiftV2");
+		const [instanceId] = await getEffectInstanceIds(page, "rgbShiftV2");
+		// Disable the layer, then bypass and un-bypass. Bypass must not mutate the
+		// per-layer enabled flag, so the layer remains unchecked throughout.
+		await page.getByTestId(layerToggle(instanceId)).uncheck();
+		await page.getByTestId(LAYERS_BYPASS).click();
+		await expect(page.getByTestId(layerToggle(instanceId))).not.toBeChecked();
+		await page.getByTestId(LAYERS_BYPASS).click();
+		await expect(page.getByTestId(layerToggle(instanceId))).not.toBeChecked();
+		expect(consoleErrors).toEqual([]);
+	});
 });

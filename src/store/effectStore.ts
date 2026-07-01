@@ -37,6 +37,14 @@ function createEffectInstance(effectId: string): EffectInstance {
 export const MAX_LAYERS = 10;
 const HISTORY_LIMIT = 100;
 
+// The effects the renderer should actually draw: none while bypassed (the
+// before/after toggle shows the original), otherwise the full stack. Single
+// source of truth so the canvas's init and subscription paths can't diverge.
+export const renderableEffects = (state: {
+	effects: readonly EffectInstance[];
+	bypassed: boolean;
+}): readonly EffectInstance[] => (state.bypassed ? [] : state.effects);
+
 // Module-level clock — advanced per rendered frame by EffectCanvas, read at
 // export time. Kept outside Zustand so writes don't trigger the notification cycle.
 let _time = 0;

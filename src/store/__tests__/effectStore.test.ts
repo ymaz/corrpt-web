@@ -5,6 +5,7 @@ import {
 	_resetHistory,
 	getTime,
 	MAX_LAYERS,
+	renderableEffects,
 	setTime,
 	useEffectStore,
 } from "../effectStore";
@@ -214,6 +215,18 @@ describe("effectStore", () => {
 		useEffectStore.getState().undo();
 		expect(useEffectStore.getState().effects).toHaveLength(0);
 		expect(useEffectStore.getState().bypassed).toBe(true);
+	});
+
+	it("renderableEffects returns the stack normally and nothing while bypassed", () => {
+		useEffectStore.getState().addEffect(TEST_EFFECT_ID);
+		const state = useEffectStore.getState();
+		// Not bypassed: the renderer sees the full stack (same reference).
+		expect(renderableEffects(state)).toBe(state.effects);
+		// Bypassed: the renderer sees an empty list, but the stack is untouched.
+		expect(
+			renderableEffects({ effects: state.effects, bypassed: true }),
+		).toEqual([]);
+		expect(state.effects).toHaveLength(1);
 	});
 
 	it("getTime returns 0 on reset", () => {

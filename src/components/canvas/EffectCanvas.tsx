@@ -13,7 +13,12 @@ import {
 	createReglContext,
 	type ReglContext,
 } from "@/engine/reglContext";
-import { getTime, setTime, useEffectStore } from "@/store/effectStore";
+import {
+	getTime,
+	renderableEffects,
+	setTime,
+	useEffectStore,
+} from "@/store/effectStore";
 import { useImageStore } from "@/store/imageStore";
 
 interface EffectCanvasProps {
@@ -166,8 +171,7 @@ function EffectCanvasInner({ className }: EffectCanvasProps) {
 		canvas.addEventListener("webglcontextlost", handleContextLost);
 
 		renderer.setImage(useImageStore.getState().bitmap);
-		const initial = useEffectStore.getState();
-		renderer.setEffects(initial.bypassed ? [] : initial.effects);
+		renderer.setEffects(renderableEffects(useEffectStore.getState()));
 
 		const sync = () => {
 			const { bitmap, dimensions } = useImageStore.getState();
@@ -232,7 +236,7 @@ function EffectCanvasInner({ className }: EffectCanvasProps) {
 			if (state.effects !== prev.effects || state.bypassed !== prev.bypassed) {
 				// Bypass renders the bare image without touching the stored layers,
 				// so toggling back restores every layer's state untouched.
-				renderer.setEffects(state.bypassed ? [] : state.effects);
+				renderer.setEffects(renderableEffects(state));
 				invalidate();
 			}
 		});
