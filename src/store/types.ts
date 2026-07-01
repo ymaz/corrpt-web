@@ -32,6 +32,8 @@ export type ImageStore = ImageState & ImageActions;
 // Effect store
 interface EffectState {
 	effects: EffectInstance[];
+	/** Preview-only before/after toggle — render the original image while true. */
+	bypassed: boolean;
 	previewMode: PreviewMode;
 	canUndo: boolean;
 	canRedo: boolean;
@@ -40,7 +42,7 @@ interface EffectState {
 interface EffectActions {
 	addEffect: (effectId: string) => void;
 	removeEffect: (instanceId: string) => void;
-	removeEffectsByEffectId: (effectId: string) => void;
+	toggleEffect: (instanceId: string) => void;
 	setEffectParam: (
 		instanceId: string,
 		paramName: string,
@@ -48,6 +50,7 @@ interface EffectActions {
 	) => void;
 	reorderEffects: (instanceIds: string[]) => void;
 	duplicateEffect: (instanceId: string) => void;
+	toggleBypass: () => void;
 	setPreviewMode: (mode: PreviewMode) => void;
 	// Replaces the whole stack with fresh instanceIds — used by preset application.
 	applyEffects: (effects: EffectInstance[]) => void;

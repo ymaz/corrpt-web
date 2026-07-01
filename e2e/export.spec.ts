@@ -1,9 +1,10 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { DOWNLOAD_BUTTON, effectToggle } from "../src/lib/test-ids";
+import { DOWNLOAD_BUTTON } from "../src/lib/test-ids";
 import {
 	activateMultiPassAuxFixture,
+	addEffectLayer,
 	expect,
 	test,
 	uploadViaLanding,
@@ -34,7 +35,7 @@ test.describe("export", () => {
 		page,
 		consoleErrors,
 	}) => {
-		await page.getByTestId(effectToggle("rgbShiftV2")).check();
+		await addEffectLayer(page, "rgbShiftV2");
 
 		const downloadPromise = page.waitForEvent("download");
 		await page.getByTestId(DOWNLOAD_BUTTON).click();

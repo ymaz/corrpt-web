@@ -12,20 +12,28 @@ export const IMAGE_WARNING = "image-warning";
 // Canvas
 export const CANVAS_ERROR = "canvas-error";
 
-// Effects panel
-export const EFFECT_DEV_PANEL = "effect-dev-panel";
-export const effectSection = (id: string) => `effect-section-${id}`;
-export const effectToggle = (id: string) => `effect-toggle-${id}`;
-export const effectInstance = (instanceId: string) =>
-	`effect-instance-${instanceId}`;
-export const effectDuplicate = (instanceId: string) =>
-	`effect-duplicate-${instanceId}`;
-export const effectRemove = (instanceId: string) =>
-	`effect-remove-${instanceId}`;
-export const effectMoveUp = (instanceId: string) =>
-	`effect-move-up-${instanceId}`;
-export const effectMoveDown = (instanceId: string) =>
-	`effect-move-down-${instanceId}`;
+// Sidebar — control panel (catalog, presets, history) + layers bucket
+export const SIDEBAR = "sidebar";
+export const SIDEBAR_TOGGLE = "sidebar-toggle";
+export const SIDEBAR_OPEN = "sidebar-open";
+export const ADD_EFFECT_BUTTON = "add-effect-button";
+export const effectAdd = (id: string) => `effect-add-${id}`;
+
+// Layers bucket
+export const LAYERS_PANEL = "layers-panel";
+export const LAYERS_EMPTY = "layers-empty";
+export const LAYERS_COUNT = "layers-count";
+export const LAYERS_BYPASS = "layers-bypass";
+export const layerItem = (instanceId: string) => `layer-item-${instanceId}`;
+export const layerToggle = (instanceId: string) => `layer-toggle-${instanceId}`;
+export const layerExpand = (instanceId: string) => `layer-expand-${instanceId}`;
+export const layerDuplicate = (instanceId: string) =>
+	`layer-duplicate-${instanceId}`;
+export const layerRemove = (instanceId: string) => `layer-remove-${instanceId}`;
+export const layerMoveUp = (instanceId: string) =>
+	`layer-move-up-${instanceId}`;
+export const layerMoveDown = (instanceId: string) =>
+	`layer-move-down-${instanceId}`;
 export const paramSlider = (instanceId: string, name: string) =>
 	`param-slider-${instanceId}-${name}`;
 export const paramValue = (instanceId: string, name: string) =>
